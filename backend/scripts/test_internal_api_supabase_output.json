@@ -1,0 +1,70 @@
+{
+  "before_status": 200,
+  "before": {
+    "connected": true,
+    "tables": {
+      "orders": {
+        "ok": true,
+        "count": 3
+      },
+      "fishers": {
+        "ok": true,
+        "count": 6
+      },
+      "lois": {
+        "ok": true,
+        "count": 2
+      },
+      "shipments": {
+        "ok": true,
+        "count": 3
+      },
+      "product_catalog": {
+        "ok": true,
+        "count": 3
+      }
+    },
+    "last_write_error": null
+  },
+  "add_status": 200,
+  "add": {
+    "id": "8b344bed-a56a-4e53-9a4e-2f8355c9d27a",
+    "status": "Onboarded",
+    "income_uplift_pct": 15.9,
+    "message": "Fisher onboarded successfully",
+    "onboarded_card": {
+      "fisher_name": "Admin Studio Path Test",
+      "boat_id": "MALPE-ADMIN-01",
+      "committed_weekly_supply_kg": 120.0,
+      "projected_income_uplift_pct": 15.9,
+      "collective_status": "Onboarded into Malpe Meen Collective"
+    }
+  },
+  "after_status": 200,
+  "after": {
+    "connected": true,
+    "tables": {
+      "orders": {
+        "ok": true,
+        "count": 3
+      },
+      "fishers": {
+        "ok": true,
+        "count": 7
+      },
+      "lois": {
+        "ok": true,
+        "count": 2
+      },
+      "shipments": {
+        "ok": true,
+        "count": 3
+      },
+      "product_catalog": {
+        "ok": true,
+        "count": 3
+      }
+    },
+    "last_write_error": null
+  }
+}

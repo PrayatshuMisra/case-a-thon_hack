@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import live_drop, orders, dashboard, fishers, lois, tracking, recommendations, experiments
+from app.routes import live_drop, orders, dashboard, fishers, lois, tracking, recommendations, experiments, supabase_status
 
 app = FastAPI(
     title="Malpe Meen LaunchOS API",
@@ -24,6 +24,7 @@ app.include_router(lois.router, tags=["LOIs"])
 app.include_router(tracking.router, tags=["Tracking"])
 app.include_router(recommendations.router, tags=["Recommendations"])
 app.include_router(experiments.router, tags=["Experiments"])
+app.include_router(supabase_status.router, tags=["Supabase"])
 
 @app.get("/")
 def read_root():

@@ -1,4 +1,8 @@
-const API_BASE = ((import.meta as any).env?.VITE_API_URL as string | undefined) ?? 'http://localhost:8000';
+// When VITE_API_URL is not set, use empty string so /api/* paths go through
+// the Vite dev-server proxy (configured in vite.config.ts) which forwards
+// them to the FastAPI backend on localhost:8000.
+// In production, set VITE_API_URL to the deployed backend URL.
+const API_BASE = ((import.meta as any).env?.VITE_API_URL as string | undefined) ?? '';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {

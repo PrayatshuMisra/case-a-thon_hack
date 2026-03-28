@@ -61,11 +61,12 @@ export const FisherStudio = () => {
     setMessage('');
     try {
       await api.addFisher(fisherForm);
-      setMessage('Fisher onboarded successfully.');
+      setMessage('✅ Fisher onboarded successfully and saved to database.');
       setFisherForm((prev) => ({ ...prev, name: '', boat_id: '', mobile_number: '' }));
       loadData();
-    } catch {
-      setMessage('Onboarding failed. Check all fields.');
+    } catch (err: any) {
+      const detail = err?.message ?? String(err);
+      setMessage(`❌ Onboarding failed: ${detail}`);
     }
   };
 

@@ -36,11 +36,15 @@
       "hsr-seer-rwa-wa": {
         "alpha": 15.0,
         "beta": 107.0
+      },
+      "test-arm-A": {
+        "alpha": 11.0,
+        "beta": 91.0
       }
     }
   },
   "meta": {
     "version": "v1",
-    "trained_on": "2026-03-28T18:41:02.890463+00:00"
+    "trained_on": "2026-03-28T19:14:29.177464+00:00"
   }
 }
