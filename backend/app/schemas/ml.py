@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RecommendationArm(BaseModel):
@@ -68,6 +68,7 @@ class MlScenarioRequest(BaseModel):
 
 
 class MlScenarioResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
     model_version: str
     feasible_probability: float
     predicted_profit: float
@@ -76,6 +77,7 @@ class MlScenarioResponse(BaseModel):
 
 
 class MlRetrainResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
     model_version: str
     samples_trained: int
     status: str

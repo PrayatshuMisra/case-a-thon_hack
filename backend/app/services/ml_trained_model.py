@@ -292,6 +292,8 @@ def _generate_training_data(samples: int = 3500) -> tuple[np.ndarray, np.ndarray
 
 
 def train_and_save_models(samples: int = 3500) -> MlArtifacts:
+    global _MODEL_CACHE
+    _MODEL_CACHE = None  # invalidate cache so next call reloads fresh model
     X, y_feasible, y_profit, y_wastage = _generate_training_data(samples)
 
     feasible_model = RandomForestClassifier(n_estimators=220, random_state=42, max_depth=14)
@@ -325,12 +327,18 @@ def train_and_save_models(samples: int = 3500) -> MlArtifacts:
     return artifacts
 
 
+_MODEL_CACHE: dict[str, Any] | None = None
+
+
 def load_or_train_models() -> dict[str, Any]:
+    global _MODEL_CACHE
+    if _MODEL_CACHE is not None:
+        return _MODEL_CACHE
     path = _model_path()
-    if path.exists():
-        return joblib.load(path)
-    train_and_save_models()
-    return joblib.load(path)
+    if not path.exists():
+        train_and_save_models()
+    _MODEL_CACHE = joblib.load(path)
+    return _MODEL_CACHE
 
 
 def predict_scenario(payload: dict[str, Any]) -> dict[str, Any]:

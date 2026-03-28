@@ -134,7 +134,7 @@ const App = () => {
         return <ProofEngine />;
       case 'fisher':
       case 'loi':
-        return <FisherStudio />;
+        return <FisherStudio initialTab={activeTab === 'loi' ? 'loi' : 'onboarding'} />;
       default:
         return persona === 'consumer' ? <Home onNavigate={navigate} onOrderReserved={handleOrderReserved} /> : <Dashboard onNavigate={navigate} />;
     }
