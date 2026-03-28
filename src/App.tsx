@@ -10,6 +10,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Logistics } from './pages/Logistics';
 import { ProofEngine } from './pages/ProofEngine';
 import { FisherStudio } from './pages/FisherStudio';
+import { DemandCapture } from './pages/DemandCapture';
 import { motion, AnimatePresence } from 'motion/react';
 
 type Persona = 'consumer' | 'admin';
@@ -124,8 +125,10 @@ const App = () => {
       case 'home':
         return <Home onNavigate={navigate} onOrderReserved={handleOrderReserved} />;
       case 'dashboard':
-      case 'demand':
         return <Dashboard onNavigate={navigate} />;
+      case 'demand':
+        return <DemandCapture />;
+
       case 'logistics':
         return <Logistics onNavigate={navigate} orderId={latestOrderId} />;
       case 'proof':

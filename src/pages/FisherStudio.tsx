@@ -18,6 +18,7 @@ import {
 import { cn } from '@/src/lib/utils';
 import { api } from '@/src/api/client';
 import jsPDF from 'jspdf';
+import logoImg from "@/src/assets/logo.png";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Props {
@@ -42,164 +43,159 @@ function generateLoiPdf(form: LoiForm): void {
   const contentW = W - margin * 2;
   let y = 0;
 
-  // ── Header bar ──
-  doc.setFillColor(0, 32, 74);          // deep navy
-  doc.rect(0, 0, W, 42, 'F');
+  // ── Header (Logo + Company Info) ──
+  try {
+    // Attempting to add the logo image
+    doc.addImage(logoImg, 'PNG', margin, 12, 14, 14);
+  } catch (err) {
+    // Fallback if image fails to load
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('MML', margin, 18);
+  }
 
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(20);
-  doc.text('MALPE MEEN LAUNCHOS', margin, 18);
+  doc.setTextColor(0, 0, 0); // Strictly black
+  doc.setFont('times', 'bold');
+  doc.setFontSize(18);
+  doc.text('MALPE MEEN LAUNCHOS', margin + 18, 18);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(180, 210, 255);
-  doc.text('Maritime Seafood Logistics • Malpe Harbor Cluster, Karnataka', margin, 27);
+  doc.setFont('times', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(60, 60, 60);
+  doc.text('Maritime & Sustainable Seafood Logistics • Harbor Cluster, Karnataka', margin + 18, 23);
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.setTextColor(255, 200, 80);
-  doc.text('LETTER OF INTENT', margin, 38);
+  doc.setFont('times', 'bolditalic');
+  doc.setFontSize(14);
+  doc.setTextColor(0, 0, 0);
+  doc.text('LETTER OF INTENT (LOI)', W / 2, 45, { align: 'center' });
+  doc.line(W / 2 - 30, 46.5, W / 2 + 30, 46.5); // Underlined headline
 
-  y = 56;
+  y = 58;
 
   // ── Date + Ref ──
   const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
   doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(100, 100, 100);
-  doc.text(`Date: ${today}`, margin, y);
-  doc.text(`Ref: MML-LOI-${Date.now().toString().slice(-6)}`, W - margin, y, { align: 'right' });
+  doc.setFont('times', 'normal');
+  doc.setTextColor(0, 0, 0);
+  doc.text(`Date of Issue: ${today}`, margin, y);
+  doc.text(`Doc Ref: MML/LOI/${Date.now().toString().slice(-4)}`, W - margin, y, { align: 'right' });
 
   y += 10;
 
-  // ── Divider ──
-  doc.setDrawColor(0, 32, 74);
-  doc.setLineWidth(0.5);
-  doc.line(margin, y, W - margin, y);
-  y += 10;
-
-  // ── Parties ──
-  const sectionTitle = (title: string) => {
-    doc.setFillColor(240, 245, 255);
-    doc.roundedRect(margin, y - 4, contentW, 10, 2, 2, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(0, 32, 74);
-    doc.text(title.toUpperCase(), margin + 4, y + 3);
-    y += 13;
+  // ── Section 1: Parties ──
+  const sectionTitle = (title: string, yPos: number) => {
+    doc.setFont('times', 'bold');
+    doc.setFontSize(11);
+    doc.text(title.toUpperCase(), margin, yPos);
+    doc.setLineWidth(0.3);
+    doc.line(margin, yPos + 1.5, margin + doc.getTextWidth(title.toUpperCase()), yPos + 1.5); // underlined
+    return yPos + 8;
   };
 
   const bodyText = (text: string, indent = 0) => {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(40, 40, 40);
+    doc.setFont('times', 'normal');
+    doc.setFontSize(10.5);
+    doc.setTextColor(0, 0, 0);
     const lines = doc.splitTextToSize(text, contentW - indent);
     doc.text(lines, margin + indent, y);
     y += lines.length * 6 + 2;
   };
 
   const labelValue = (label: string, value: string) => {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(80, 80, 80);
+    doc.setFont('times', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
     doc.text(label + ':', margin + 4, y);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(20, 20, 20);
-    doc.text(value, margin + 52, y);
-    y += 7;
+    doc.setFont('times', 'italic');
+    const valX = margin + 45;
+    const valW = contentW - 45;
+    const lines = doc.splitTextToSize(value, valW);
+    doc.text(lines, valX, y);
+    y += Math.max(7, lines.length * 5 + 2);
   };
 
-  sectionTitle('1. Parties');
-  labelValue('Seller / Initiator', 'Malpe Meen LaunchOS, Malpe Harbor, Udupi District, Karnataka');
-  labelValue('Buyer', `${form.buyer_name} (${form.buyer_type})`);
+  y = sectionTitle('1. Identification of Parties', y);
+  labelValue('Primary Seller', 'Malpe Meen LaunchOS (Maritime Collective)');
+  labelValue('Registered Address', 'Malpe Main Harbor, Udupi Dist., KA 576108');
+  labelValue('Proposed Buyer', `${form.buyer_name} / ${form.buyer_type}`);
   y += 4;
 
-  sectionTitle('2. Purpose');
+  y = sectionTitle('2. Statement of Intent', y);
   bodyText(
-    `This Letter of Intent ("LOI") documents the formal intent of ${form.buyer_name || '[Buyer Name]'} to ` +
-    `engage in a seafood procurement relationship with Malpe Meen LaunchOS. The Buyer expresses commitment ` +
-    `to reserving priority seafood landings from the Malpe Harbor Cluster, facilitated through the ` +
-    `LaunchOS cold-chain logistics infrastructure.`
+    `This legally non-binding Letter of Intent ("LOI") formalizes the intent of the Buyer, ${form.buyer_name || '[NAME]'}, ` +
+    `to collaborate with Malpe Meen LaunchOS for the procurement of verified seafood landings. ` +
+    `Both parties agree to explore a long-term supply relationship facilitated by the LaunchOS supply-chain network.`
   );
   y += 2;
 
-  sectionTitle('3. Commitment Terms');
+  y = sectionTitle('3. Proposed Commercial Terms', y);
   const weeklyKg = Math.round(form.monthly_volume_kg / 4);
-  labelValue('Monthly Volume', `${form.monthly_volume_kg} kg/month (≈ ${weeklyKg} kg/week)`);
-  labelValue('Contract Duration', `${form.duration_days} days`);
-  labelValue('Primary Varieties', 'Seer Fish (Kingfish), Pomfret, Tiger Prawns');
-  labelValue('Quality Standard', 'LaunchOS Grade A — 90+ Freshness Score');
-  labelValue('Price Basis', form.price_note);
-  labelValue('Delivery Terms', form.delivery_terms);
+  labelValue('Target Volume', `${form.monthly_volume_kg} kg/month (Avg. ${weeklyKg} kg p.w.)`);
+  labelValue('Term of Pilot', `${form.duration_days} Days Assessment`);
+  labelValue('Product Focus', 'Kingfish (Seer), Premium Pomfret, Tiger Prawns');
+  labelValue('Pricing Mechanism', `${form.price_note} (Underlined value)`);
+  labelValue('Logistics / Delivery', form.delivery_terms);
   y += 2;
 
   if (form.special_notes?.trim()) {
-    sectionTitle('4. Special Conditions');
+    y = sectionTitle('4. Additional Stipulations', y);
     bodyText(form.special_notes);
     y += 2;
   }
 
-  sectionTitle(`${form.special_notes?.trim() ? '5' : '4'}. Standard Clauses`);
+  y = sectionTitle('5. General Clauses', y);
   const clauses = [
-    'Fresh catch supply sourced exclusively from registered Malpe fishing collective members.',
-    'Cold-chain monitored transport: harvest-to-delivery temperature maintained ≤ 4°C.',
-    'Indicative pricing subject to freshness confidence score and real-time demand.',
-    'Traceability logs and source vessel records shared with every batch.',
-    'This LOI is non-binding and subject to pilot sample acceptance by both parties.',
+    'Sourcing protocol strictly follows Malpe Fishery Sustainability guidelines.',
+    'Temperature control for transit shall remain at or below 4 degrees Centigrade throughout.',
+    'This document does not create a binding legal obligation to purchase.',
+    'All financial settlements shall happen as per subsequent Purchase Orders.',
   ];
   clauses.forEach((c, i) => {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9.5);
-    doc.setTextColor(50, 50, 50);
-    const lines = doc.splitTextToSize(`${i + 1}.  ${c}`, contentW - 6);
+    doc.setFont('times', 'normal');
+    doc.setFontSize(10);
+    const text = `${i + 1}.  ${c}`;
+    const lines = doc.splitTextToSize(text, contentW - 8);
     doc.text(lines, margin + 4, y);
-    y += lines.length * 5.5 + 2;
+    y += lines.length * 6 + 1;
   });
 
-  y += 6;
+  y += 15;
 
-  // ── Signature block ──
-  doc.setDrawColor(200, 210, 230);
-  doc.setLineWidth(0.3);
-  doc.line(margin, y, W - margin, y);
-  y += 10;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(0, 32, 74);
-  doc.text('Authorised Signatory', margin, y + 20);
-  doc.text('Buyer Representative', W - margin, y + 20, { align: 'right' });
-
-  // signature lines
-  doc.setDrawColor(0, 32, 74);
+  // ── Signatures ──
   doc.setLineWidth(0.4);
-  doc.line(margin, y + 16, margin + 70, y + 16);
-  doc.line(W - margin - 70, y + 16, W - margin, y + 16);
+  doc.line(margin, y + 16, margin + 65, y + 16);
+  doc.line(W - margin - 65, y + 16, W - margin, y + 16);
 
-  doc.setFont('helvetica', 'normal');
+  // Handwritten Signatures
+  doc.setFont('courier', 'bolditalic');
+  doc.setFontSize(14);
+  doc.text('Ravi', margin + 5, y + 12); // Admin Signature
+  
+  doc.setFont('times', 'bold');
+  doc.setFontSize(9);
+  doc.text('Authorised Signatory (Admin)', margin, y + 21);
+  doc.text('Proposed Buyer Representative', W - margin, y + 21, { align: 'right' });
+
+  doc.setFont('times', 'normal');
   doc.setFontSize(8);
-  doc.setTextColor(120, 120, 120);
-  doc.text('Malpe Meen LaunchOS', margin, y + 26);
-  doc.text(form.buyer_name || '[Buyer Name]', W - margin, y + 26, { align: 'right' });
-
-  y += 38;
+  doc.text('Name: Ravi K. (LaunchOS Admin)', margin + 3, y + 25);
+  doc.text(`Name: ${form.buyer_name}`, W - margin - 3, y + 25, { align: 'right' });
+  doc.text(`Title: ${form.buyer_type} Official`, W - margin - 3, y + 29, { align: 'right' });
 
   // ── Footer ──
-  doc.setFillColor(0, 32, 74);
   const pageH = doc.internal.pageSize.getHeight();
-  doc.rect(0, pageH - 16, W, 16, 'F');
-  doc.setFont('helvetica', 'normal');
+  doc.setDrawColor(200, 200, 200);
+  doc.line(margin, pageH - 20, W - margin, pageH - 20);
   doc.setFontSize(7.5);
-  doc.setTextColor(160, 200, 255);
+  doc.setTextColor(120, 120, 120);
   doc.text(
-    'This document is generated by Malpe Meen LaunchOS • Non-binding indicative intent • Subject to formal agreement',
+    'MML-LOI Revision Feb-2026 • malpemeen.os.launch • Confirmatory draft only.',
     W / 2,
-    pageH - 7,
+    pageH - 12,
     { align: 'center' }
   );
 
-  doc.save(`LOI-${(form.buyer_name || 'Draft').replace(/\s+/g, '_')}-${Date.now()}.pdf`);
+  doc.save(`LOI_${(form.buyer_name || 'Draft').replace(/\s+/g, '_')}_${Date.now().toString().slice(-4)}.pdf`);
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -687,81 +683,106 @@ export const FisherStudio = ({ initialTab = 'onboarding' }: Props) => {
                 const today = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
 
                 return (
-                  <div className="flex-1 border-2 border-slate-50 rounded-3xl overflow-hidden">
-                    {/* Doc header */}
-                    <div className="bg-[#00204a] text-white px-10 py-7">
-                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-blue-300 mb-1">Malpe Meen LaunchOS • Maritime Logistics</p>
-                      <h4 className="text-2xl font-black tracking-tight">Letter of Intent</h4>
-                      <div className="flex items-center justify-between mt-2">
-                        <p className="text-xs text-blue-200">{today}</p>
-                        <span className="text-[10px] font-bold bg-yellow-400 text-[#00204a] px-3 py-0.5 rounded-full uppercase tracking-widest">
-                          {previewLoi ? 'Saved LOI' : 'Draft Preview'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Doc body */}
-                    <div className="p-8 space-y-6 text-slate-700 font-serif overflow-y-auto" style={{ maxHeight: 480 }}>
-                      <div className="grid grid-cols-2 gap-6 text-sm">
-                        <div className="bg-slate-50 rounded-2xl p-4">
-                          <p className="text-[9px] font-sans font-black uppercase tracking-widest text-slate-400 mb-2">Seller / Initiator</p>
-                          <p className="font-bold text-primary text-xs">Malpe Meen LaunchOS</p>
-                          <p className="text-[10px] text-slate-500 mt-0.5">Malpe Harbor, Udupi District, Karnataka</p>
+                  <div className="flex-1 border border-slate-200 rounded-3xl overflow-hidden bg-[#fafafa] shadow-inner p-8">
+                    <div className="bg-white border border-slate-200 shadow-sm min-h-[800px] w-full max-w-[650px] mx-auto p-12 flex flex-col font-serif text-black leading-normal">
+                      
+                      {/* Logo & Header */}
+                      <div className="flex items-start justify-between mb-10 border-b-2 border-black pb-6">
+                        <div className="flex items-center gap-4">
+                          <img src={logoImg} alt="Logo" className="w-16 h-16 object-contain" />
+                          <div>
+                            <h4 className="text-xl font-bold uppercase tracking-tight">Malpe Meen LaunchOS</h4>
+                            <p className="text-[10px] font-sans font-medium text-slate-500 uppercase tracking-widest">Maritime & Sustainable Seafood Logistics</p>
+                          </div>
                         </div>
-                        <div className="bg-slate-50 rounded-2xl p-4">
-                          <p className="text-[9px] font-sans font-black uppercase tracking-widest text-slate-400 mb-2">Buyer</p>
-                          <p className="font-bold text-primary text-xs">{buyerName}</p>
-                          <p className="text-[10px] text-slate-500 mt-0.5">{buyerType}</p>
+                        <div className="text-right">
+                          <h5 className="text-lg font-bold underline">LETTER OF INTENT</h5>
+                          <p className="text-[9px] font-sans mt-1">Ref: MML/LOI/{Date.now().toString().slice(-4)}</p>
                         </div>
                       </div>
 
-                      <div>
-                        <p className="text-[9px] font-sans font-black uppercase tracking-widest text-slate-400 mb-2">Purpose</p>
-                        <p className="text-xs leading-relaxed">
-                          This LOI documents the formal intent of <strong>{buyerName}</strong> to engage in a seafood
-                          procurement relationship with Malpe Meen LaunchOS, reserving priority landings from the Malpe
-                          Harbor Cluster via the LaunchOS cold-chain logistics infrastructure.
-                        </p>
+                      <div className="flex justify-between text-xs mb-8 italic">
+                        <p>Date: {today}</p>
+                        <p>Valid Location: Malpe Harbor, Udupi</p>
                       </div>
 
-                      <div>
-                        <p className="text-[9px] font-sans font-black uppercase tracking-widest text-slate-400 mb-3">Commitment Terms</p>
-                        <div className="grid grid-cols-2 gap-2">
-                          {[
-                            ['Monthly Volume', `${monthlyVol} kg/month`],
-                            ['Weekly Volume', `≈ ${wklyVol} kg/week`],
-                            ['Duration', `${duration} days`],
-                            ['Quality', 'Grade A — 90+ Freshness'],
-                            ['Price Basis', priceNote],
-                            ['Delivery', delivTerms],
-                          ].map(([k, v]) => (
-                            <div key={k} className="bg-slate-50 rounded-xl p-3">
-                              <p className="text-[8px] font-sans font-black uppercase tracking-widest text-slate-400">{k}</p>
-                              <p className="text-xs font-bold text-primary mt-0.5">{v}</p>
+                      {/* Content sections */}
+                      <div className="space-y-8">
+                        <div>
+                          <h6 className="text-xs font-bold uppercase underline mb-3">1. Identification of Parties</h6>
+                          <div className="grid grid-cols-2 gap-4 text-xs">
+                            <div>
+                              <p className="font-bold mb-1 italic">On behalf of Seller:</p>
+                              <p>MALPE MEEN LAUNCHOS</p>
+                              <p className="text-slate-500">Malpe Main Harbor, KA 576108</p>
                             </div>
-                          ))}
+                            <div>
+                              <p className="font-bold mb-1 italic">On behalf of Proposed Buyer:</p>
+                              <p className="uppercase">{buyerName}</p>
+                              <p className="text-slate-500">{buyerType}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h6 className="text-xs font-bold uppercase underline mb-2">2. Statement of Intent</h6>
+                          <p className="text-sm leading-relaxed">
+                            This documents the formal intent of <strong>{buyerName}</strong> (the "Buyer") to engage in a seafood
+                            procurement relationship with Malpe Meen LaunchOS. The Buyer expresses a serious interest in
+                            reserving priority landings of seasonal catch, specifically for <strong><i>Grade A</i></strong> quality fresh seafood.
+                          </p>
+                        </div>
+
+                        <div>
+                          <h6 className="text-xs font-bold uppercase underline mb-3">3. Key Terms of Proposed Engagement</h6>
+                          <table className="w-full text-xs border-collapse">
+                            <tbody>
+                              <tr className="border-b border-slate-100">
+                                <td className="py-2 font-bold w-1/3 italic">Monthly Volume</td>
+                                <td className="py-2 text-primary">{monthlyVol} kg Per Month (≈ {wklyVol} kg Weekly)</td>
+                              </tr>
+                              <tr className="border-b border-slate-100">
+                                <td className="py-2 font-bold italic">Pilot Duration</td>
+                                <td className="py-2">{duration} Days of Active Supply</td>
+                              </tr>
+                              <tr className="border-b border-slate-100">
+                                <td className="py-2 font-bold italic">Pricing Basis</td>
+                                <td className="py-2 font-bold">{priceNote}</td>
+                              </tr>
+                              <tr className="border-b border-slate-100">
+                                <td className="py-2 font-bold italic">Delivery Protocol</td>
+                                <td className="py-2 italic underline">{delivTerms}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {notes && (
+                          <div>
+                            <h6 className="text-xs font-bold uppercase underline mb-2">4. Special Stipulations</h6>
+                            <p className="text-xs bg-slate-50 p-3 border-l-2 border-black italic">"{notes}"</p>
+                          </div>
+                        )}
+
+                        <div className="pt-10 flex justify-between items-end mt-auto">
+                          <div className="relative text-center">
+                            <p className="font-script text-2xl absolute -top-8 left-4 text-slate-800" style={{ fontFamily: 'Brush Script MT, cursive' }}>Ravi</p>
+                            <div className="w-48 h-px bg-black mb-2" />
+                            <p className="text-[10px] uppercase font-bold">Authorised Signatory</p>
+                            <p className="text-[9px]">LaunchOS Admin (Ravi K.)</p>
+                          </div>
+                          
+                          <div className="text-center">
+                            <div className="w-48 h-px bg-black mb-2" />
+                            <p className="text-[10px] uppercase font-bold">Buyer Representative</p>
+                            <p className="text-[9px] uppercase">{buyerName}</p>
+                          </div>
                         </div>
                       </div>
 
-                      {notes && (
-                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                          <p className="text-[9px] font-sans font-black uppercase tracking-widest text-amber-600 mb-1">Special Notes</p>
-                          <p className="text-xs leading-relaxed text-slate-700">{notes}</p>
-                        </div>
-                      )}
-
-                      {/* Signature */}
-                      <div className="pt-4 flex justify-between items-end border-t border-slate-100">
-                        <div className="space-y-1">
-                          <div className="w-40 h-px bg-slate-300" />
-                          <p className="text-[9px] font-sans font-black uppercase tracking-widest text-slate-400">Authorised Signatory</p>
-                          <p className="text-xs font-bold text-primary">Malpe Meen LaunchOS</p>
-                        </div>
-                        <div className="space-y-1 text-right">
-                          <div className="w-40 h-px bg-slate-300 ml-auto" />
-                          <p className="text-[9px] font-sans font-black uppercase tracking-widest text-slate-400">Buyer Representative</p>
-                          <p className="text-xs font-bold text-primary">{buyerName}</p>
-                        </div>
+                      <div className="mt-auto pt-12 text-[8px] text-center text-slate-400 border-t border-slate-100 italic">
+                        This is a preliminary document of intent generated via the Malpe Meen LaunchOS network.
+                        All final transactions are subject to formal contract confirmation.
                       </div>
                     </div>
                   </div>

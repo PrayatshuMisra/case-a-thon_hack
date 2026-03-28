@@ -164,61 +164,54 @@ set
   status = excluded.status,
   preview = excluded.preview;
 
--- 5) Orders (linked to existing shipments)
+-- 5) Orders (linked to existing shipments) — 33 orders across 7 days
 insert into orders (
   id, customer_name, phone, apartment_name, locality,
   product_name, quantity_kg, price_per_kg, total_amount,
   freshness_score, freshness_label, status, shipment_id, created_at
 )
 values
-  (
-    '88888888-8888-4888-8888-888888888888',
-    'Aditya Verma',
-    '+919845009999',
-    'Sobha Dream Acres',
-    'Whitefield',
-    'Seer Fish',
-    1.50,
-    349.00,
-    523.50,
-    93.7,
-    'Excellent',
-    'Reserved',
-    '11111111-1111-4111-8111-111111111111',
-    now() - interval '2 hours'
-  ),
-  (
-    '99999999-9999-4999-8999-999999999999',
-    'Priya Kulkarni',
-    '+919845008888',
-    'Prestige Shantiniketan',
-    'Whitefield',
-    'Pomfret',
-    1.00,
-    407.55,
-    407.55,
-    88.2,
-    'High',
-    'Reserved',
-    '22222222-2222-4222-8222-222222222222',
-    now() - interval '70 minutes'
-  ),
-  (
-    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-    'Rohan Nair',
-    '+919845007777',
-    'Mantri Alpyne',
-    'Indiranagar',
-    'Prawns',
-    0.75,
-    350.10,
-    262.58,
-    79.4,
-    'Moderate',
-    'Reserved',
-    '33333333-3333-4333-8333-333333333333',
-    now() - interval '30 minutes'
-  )
+  -- ── Today ──
+  ('88888888-8888-4888-8888-888888888888','Aditya Verma','+919845009999','Sobha Dream Acres','Whitefield','Seer Fish',1.50,349.00,523.50,93.7,'Excellent','Reserved','11111111-1111-4111-8111-111111111111',now() - interval '2 hours'),
+  ('99999999-9999-4999-8999-999999999999','Priya Kulkarni','+919845008888','Prestige Shantiniketan','Whitefield','Pomfret',1.00,407.55,407.55,88.2,'High','Reserved','22222222-2222-4222-8222-222222222222',now() - interval '70 minutes'),
+  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','Rohan Nair','+919845007777','Mantri Alpyne','Indiranagar','Prawns',0.75,350.10,262.58,79.4,'Moderate','Reserved','33333333-3333-4333-8333-333333333333',now() - interval '30 minutes'),
+  ('b0000001-0000-4000-8000-000000000001','Sneha Rao','+919845001001','Salarpuria Sattva','HSR Layout','Seer Fish',2.00,349.00,698.00,91.5,'Excellent','Reserved','11111111-1111-4111-8111-111111111111',now() - interval '4 hours'),
+  ('b0000002-0000-4000-8000-000000000002','Kiran Shetty','+919845001002','Golden Gate','Koramangala','Pomfret',1.50,407.55,611.33,86.3,'High','Reserved','22222222-2222-4222-8222-222222222222',now() - interval '6 hours'),
+  ('b0000003-0000-4000-8000-000000000003','Anitha Bhat','+919845001003','Purva Panorama','Whitefield','Prawns',1.25,389.00,486.25,82.1,'High','Reserved','33333333-3333-4333-8333-333333333333',now() - interval '8 hours'),
+  -- ── Yesterday (Day -1) ──
+  ('b0000004-0000-4000-8000-000000000004','Mahesh Kumar','+919845001004','Brigade Cosmos','Whitefield','Seer Fish',1.75,349.00,610.75,94.1,'Excellent','Delivered','11111111-1111-4111-8111-111111111111',now() - interval '1 day 3 hours'),
+  ('b0000005-0000-4000-8000-000000000005','Deepa Nair','+919845001005','Mantri Alpyne','Indiranagar','Pomfret',1.00,407.55,407.55,87.8,'High','Delivered','22222222-2222-4222-8222-222222222222',now() - interval '1 day 5 hours'),
+  ('b0000006-0000-4000-8000-000000000006','Vivek Menon','+919845001006','Sobha Quartz','Whitefield','Seer Fish',2.50,349.00,872.50,92.3,'Excellent','Delivered','11111111-1111-4111-8111-111111111111',now() - interval '1 day 8 hours'),
+  ('b0000007-0000-4000-8000-000000000007','Ritu Sharma','+919845001007','RMZ Galleria','Koramangala','Prawns',0.80,389.00,311.20,76.5,'Moderate','Delivered','33333333-3333-4333-8333-333333333333',now() - interval '1 day 11 hours'),
+  ('b0000008-0000-4000-8000-000000000008','Arjun Patel','+919845001008','Prestige Lakeside','Bellandur','Seer Fish',1.20,349.00,418.80,89.6,'High','Delivered','11111111-1111-4111-8111-111111111111',now() - interval '1 day 15 hours'),
+  ('b0000009-0000-4000-8000-000000000009','Pooja Iyer','+919845001009','Brigade Utopia','HSR Layout','Pomfret',2.00,407.55,815.10,91.2,'Excellent','Delivered','22222222-2222-4222-8222-222222222222',now() - interval '1 day 20 hours'),
+  -- ── Day -2 ──
+  ('b0000010-0000-4000-8000-000000000010','Sanjay Hegde','+919845001010','Salarpuria Gold Summit','HSR Layout','Seer Fish',1.50,349.00,523.50,90.1,'Excellent','Delivered','11111111-1111-4111-8111-111111111111',now() - interval '2 days 2 hours'),
+  ('b0000011-0000-4000-8000-000000000011','Nalini Prasad','+919845001011','Bhartiya City','Whitefield','Pomfret',1.25,407.55,509.44,85.9,'High','Delivered','22222222-2222-4222-8222-222222222222',now() - interval '2 days 7 hours'),
+  ('b0000012-0000-4000-8000-000000000012','Suresh Babu','+919845001012','Adarsh Palm Retreat','Bellandur','Prawns',2.00,389.00,778.00,80.3,'High','Delivered','33333333-3333-4333-8333-333333333333',now() - interval '2 days 10 hours'),
+  ('b0000013-0000-4000-8000-000000000013','Nandini Rao','+919845001013','Golden Gate','Koramangala','Seer Fish',1.00,349.00,349.00,93.4,'Excellent','Delivered','11111111-1111-4111-8111-111111111111',now() - interval '2 days 14 hours'),
+  ('b0000014-0000-4000-8000-000000000014','Ramesh Shetty','+919845001014','Mantri Tranquil','Indiranagar','Pomfret',1.75,407.55,712.21,88.7,'High','Delivered','22222222-2222-4222-8222-222222222222',now() - interval '2 days 18 hours'),
+  -- ── Day -3 ──
+  ('b0000015-0000-4000-8000-000000000015','Geeta Menon','+919845001015','Purva Venezia','Whitefield','Seer Fish',2.25,349.00,785.25,94.8,'Excellent','Delivered','11111111-1111-4111-8111-111111111111',now() - interval '3 days 1 hour'),
+  ('b0000016-0000-4000-8000-000000000016','Anand Krishnan','+919845001016','Brigade Orchards','Bellandur','Prawns',1.50,389.00,583.50,77.2,'Moderate','Delivered','33333333-3333-4333-8333-333333333333',now() - interval '3 days 5 hours'),
+  ('b0000017-0000-4000-8000-000000000017','Sunita Patil','+919845001017','Prestige Shantiniketan','Whitefield','Pomfret',1.00,407.55,407.55,90.5,'Excellent','Delivered','22222222-2222-4222-8222-222222222222',now() - interval '3 days 9 hours'),
+  ('b0000018-0000-4000-8000-000000000018','Harish Gowda','+919845001018','RMZ Infinity','Koramangala','Seer Fish',1.25,349.00,436.25,88.9,'High','Delivered','11111111-1111-4111-8111-111111111111',now() - interval '3 days 14 hours'),
+  ('b0000019-0000-4000-8000-000000000019','Kavitha Reddy','+919845001019','Mantri Serenity','Indiranagar','Prawns',0.75,389.00,291.75,81.6,'High','Delivered','33333333-3333-4333-8333-333333333333',now() - interval '3 days 19 hours'),
+  -- ── Day -4 ──
+  ('b0000020-0000-4000-8000-000000000020','Sunil Bangera','+919845001020','Sobha Daffodil','Whitefield','Seer Fish',2.00,349.00,698.00,92.7,'Excellent','Delivered','11111111-1111-4111-8111-111111111111',now() - interval '4 days 2 hours'),
+  ('b0000021-0000-4000-8000-000000000021','Meera Pillai','+919845001021','Salarpuria Sattva','HSR Layout','Pomfret',1.50,407.55,611.33,86.1,'High','Delivered','22222222-2222-4222-8222-222222222222',now() - interval '4 days 7 hours'),
+  ('b0000022-0000-4000-8000-000000000022','Rajesh Kamath','+919845001022','Adarsh Lakefront','Bellandur','Prawns',1.00,389.00,389.00,79.8,'Moderate','Delivered','33333333-3333-4333-8333-333333333333',now() - interval '4 days 11 hours'),
+  ('b0000023-0000-4000-8000-000000000023','Lakshmi Nair','+919845001023','Bhartiya Nikoo Homes','Whitefield','Seer Fish',1.75,349.00,610.75,91.3,'Excellent','Delivered','11111111-1111-4111-8111-111111111111',now() - interval '4 days 16 hours'),
+  -- ── Day -5 ──
+  ('b0000024-0000-4000-8000-000000000024','Vinod Kumar','+919845001024','Golden Gate','Koramangala','Pomfret',2.00,407.55,815.10,89.4,'High','Delivered','22222222-2222-4222-8222-222222222222',now() - interval '5 days 3 hours'),
+  ('b0000025-0000-4000-8000-000000000025','Divya Shenoy','+919845001025','Brigade Utopia','HSR Layout','Seer Fish',1.25,349.00,436.25,93.2,'Excellent','Delivered','11111111-1111-4111-8111-111111111111',now() - interval '5 days 7 hours'),
+  ('b0000026-0000-4000-8000-000000000026','Ganesh Rao','+919845001026','Mantri Alpyne','Indiranagar','Prawns',1.50,389.00,583.50,80.7,'High','Delivered','33333333-3333-4333-8333-333333333333',now() - interval '5 days 12 hours'),
+  ('b0000027-0000-4000-8000-000000000027','Asha Hegde','+919845001027','Purva Highland','Bellandur','Pomfret',1.00,407.55,407.55,87.1,'High','Delivered','22222222-2222-4222-8222-222222222222',now() - interval '5 days 18 hours'),
+  -- ── Day -6 ──
+  ('b0000028-0000-4000-8000-000000000028','Prasad Shetty','+919845001028','Sobha Dream Acres','Whitefield','Seer Fish',2.50,349.00,872.50,94.6,'Excellent','Delivered','11111111-1111-4111-8111-111111111111',now() - interval '6 days 2 hours'),
+  ('b0000029-0000-4000-8000-000000000029','Rekha Bhat','+919845001029','Salarpuria Gold Summit','HSR Layout','Prawns',1.25,389.00,486.25,78.9,'Moderate','Delivered','33333333-3333-4333-8333-333333333333',now() - interval '6 days 8 hours'),
+  ('b0000030-0000-4000-8000-000000000030','Mohan Pillai','+919845001030','Prestige Lakeside','Bellandur','Pomfret',1.75,407.55,712.21,85.3,'High','Delivered','22222222-2222-4222-8222-222222222222',now() - interval '6 days 14 hours'),
+  ('b0000031-0000-4000-8000-000000000031','Chitra Rao','+919845001031','RMZ Galleria','Koramangala','Seer Fish',1.00,349.00,349.00,90.8,'Excellent','Delivered','11111111-1111-4111-8111-111111111111',now() - interval '6 days 20 hours')
 on conflict (id) do update
 set
   customer_name = excluded.customer_name,

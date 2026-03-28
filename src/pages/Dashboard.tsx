@@ -63,6 +63,12 @@ const productData = [
 ];
 
 const PROCESSING_OPTION_IDS = ['pickling', 'drying_salting', 'minced_products', 'fish_silage', 'fishmeal', 'collagen', 'chitosan', 'fertilizer'] as const;
+const CHANNEL_DESTINATION: Record<'Customer' | 'Restaurant' | 'Retail' | 'Industrial', string> = {
+  Customer: 'Apartment D2C delivery flow',
+  Restaurant: 'Restaurant and HoReCa commitment flow',
+  Retail: 'Flash retail / marketplace flow',
+  Industrial: 'Processing and industrial buyer flow',
+};
 
 const formatCurrency = (value: number): string => `₹${Math.round(value).toLocaleString('en-IN')}`;
 const formatNullableCurrency = (value: number | null | undefined): string => (value == null ? 'N/A' : formatCurrency(value));
@@ -81,6 +87,10 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
   const [aiInsight, setAiInsight] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [operationsFilter, setOperationsFilter] = useState<'All' | 'High' | 'Medium' | 'Low' | 'AtRisk'>('All');
+  const [commitmentActionState, setCommitmentActionState] = useState<
+    Record<string, { lastAction: string; at: string; suggestedPricePerKg?: number }>
+  >({});
 
   useEffect(() => {
     api.getDashboardMetrics().then(setMetrics).catch(() => setStatus('Live metrics unavailable. Showing fallback values.'));
@@ -258,6 +268,62 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
 
   const selectedStock = useMemo(() => currentStocks.find((item) => item.id === selectedStockId) ?? currentStocks[0], [selectedStockId]);
 
+  const commitmentInsights = useMemo(() => {
+    return commitments.map((commitment) => {
+      const stock = currentStocks.find((s) => s.species === commitment.species);
+      const bestBase = stock ? recommendBestOption(stock, orderHistory, commitments) : null;
+      const availableKg = stock?.availableKg ?? 0;
+      const shortfallKg = Math.max(0, commitment.dailyQtyKg - availableKg);
+      const surplusKg = Math.max(0, availableKg - commitment.dailyQtyKg);
+      const marginPerKg = commitment.agreedPricePerKg - (stock?.basePricePerKg ?? commitment.agreedPricePerKg);
+      const atRisk = shortfallKg > 0 || (bestBase?.projectedProfit ?? 0) < 0;
+      const suggestedPricePerKg = shortfallKg > 0
+        ? Math.round(commitment.agreedPricePerKg * 1.06)
+        : Math.round(commitment.agreedPricePerKg * 1.02);
+
+      return {
+        ...commitment,
+        stockId: stock?.id,
+        availableKg,
+        shortfallKg,
+        surplusKg,
+        atRisk,
+        bestRouteLabel: bestBase?.option.label ?? 'Manual review',
+        bestRouteId: bestBase?.option.id,
+        marginPerKg,
+        suggestedPricePerKg,
+      };
+    });
+  }, [orderHistory]);
+
+  const operationsSummary = useMemo(() => {
+    const totalCommitmentKg = commitmentInsights.reduce((acc, c) => acc + c.dailyQtyKg, 0);
+    const totalShortfallKg = commitmentInsights.reduce((acc, c) => acc + c.shortfallKg, 0);
+    const atRiskCount = commitmentInsights.filter((c) => c.atRisk).length;
+    return { totalCommitmentKg, totalShortfallKg, atRiskCount };
+  }, [commitmentInsights]);
+
+  const filteredCommitments = useMemo(() => {
+    if (operationsFilter === 'All') return commitmentInsights;
+    if (operationsFilter === 'AtRisk') return commitmentInsights.filter((c) => c.atRisk);
+    return commitmentInsights.filter((c) => c.priority === operationsFilter);
+  }, [commitmentInsights, operationsFilter]);
+
+  const applyCommitmentAction = (
+    commitmentId: string,
+    action: string,
+    extras?: { suggestedPricePerKg?: number }
+  ) => {
+    setCommitmentActionState((prev) => ({
+      ...prev,
+      [commitmentId]: {
+        lastAction: action,
+        at: new Date().toISOString(),
+        ...(extras ?? {}),
+      },
+    }));
+  };
+
   const strategyCatalog = useMemo(() => getStrategyCatalog(), []);
 
   const selectedStockScenarios = useMemo(
@@ -277,19 +343,87 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
 
   const inventorySnapshot = useMemo(() => {
     return currentStocks.map((stock) => {
-      const best = recommendBestOption(stock, orderHistory, commitments);
-      const impliedPricePerKg = best && best.projectedRevenue != null && best.fulfillmentKg > 0
-        ? Math.round(best.projectedRevenue / best.fulfillmentKg)
+      const feasibleScenarios = evaluateStockScenarios(stock, orderHistory, commitments).filter((s) => s.feasible);
+      if (!feasibleScenarios.length) {
+        return {
+          ...stock,
+          bestOption: 'Manual review',
+          forecastDemandKg: 0,
+          projectedWastagePct: 100,
+          impliedPricePerKg: stock.basePricePerKg,
+        };
+      }
+
+      const qualityBoost = 1 + (stock.healthScore - 80) / 200;
+      const coldChainBoost = stock.coldChainMaintained ? 1.03 : 0.94;
+
+      const bestPlan = feasibleScenarios
+        .map((scenario) => {
+          const baseProfit = scenario.projectedProfit ?? Number.NEGATIVE_INFINITY;
+          const baseRevenue = scenario.projectedRevenue ?? 0;
+
+          const recoveryCandidates = strategyCatalog
+            .filter((option) => PROCESSING_OPTION_IDS.includes(option.id as (typeof PROCESSING_OPTION_IDS)[number]))
+            .filter((option) => !option.applicableSpecies || option.applicableSpecies.includes(stock.species))
+            .map((option) => {
+              const leftoverKg = scenario.wastageKg;
+              const recoveredKg = leftoverKg * option.yieldRatio;
+              const residualWastageKg = leftoverKg * (1 - option.yieldRatio);
+              const residualWastagePct = stock.availableKg > 0
+                ? Math.round((residualWastageKg / stock.availableKg) * 1000) / 10
+                : 0;
+
+              const processPrice = stock.basePricePerKg * option.priceMultiplier * qualityBoost * coldChainBoost * 0.92;
+              const additionalRevenue = recoveredKg * processPrice;
+              const additionalCost = leftoverKg * option.processingCostPerKg + leftoverKg * stock.basePricePerKg * 0.08;
+              const additionalProfit = additionalRevenue - additionalCost;
+
+              return {
+                optionLabel: option.label,
+                recoveredKg,
+                residualWastagePct,
+                finalRevenue: baseRevenue + additionalRevenue,
+                finalProfit: baseProfit + additionalProfit,
+              };
+            });
+
+          const bestRecovery = recoveryCandidates.sort((a, b) => b.finalProfit - a.finalProfit)[0];
+
+          if (!bestRecovery || bestRecovery.finalProfit <= baseProfit) {
+            return {
+              label: scenario.option.label,
+              forecastDemandKg: scenario.forecastDemandKg,
+              projectedWastagePct: scenario.wastagePercentage,
+              finalRevenue: baseRevenue,
+              finalProfit: baseProfit,
+              soldKg: scenario.fulfillmentKg,
+            };
+          }
+
+          return {
+            label: `${scenario.option.label} + ${bestRecovery.optionLabel}`,
+            forecastDemandKg: scenario.forecastDemandKg,
+            projectedWastagePct: bestRecovery.residualWastagePct,
+            finalRevenue: bestRecovery.finalRevenue,
+            finalProfit: bestRecovery.finalProfit,
+            soldKg: scenario.fulfillmentKg + bestRecovery.recoveredKg,
+          };
+        })
+        .sort((a, b) => b.finalProfit - a.finalProfit)[0];
+
+      const impliedPricePerKg = bestPlan && bestPlan.finalRevenue > 0 && bestPlan.soldKg > 0
+        ? Math.round(bestPlan.finalRevenue / bestPlan.soldKg)
         : stock.basePricePerKg;
+
       return {
         ...stock,
-        bestOption: best?.option.label ?? 'Manual review',
-        forecastDemandKg: best?.forecastDemandKg ?? 0,
-        projectedWastagePct: best?.wastagePercentage ?? 100,
+        bestOption: bestPlan?.label ?? 'Manual review',
+        forecastDemandKg: bestPlan?.forecastDemandKg ?? 0,
+        projectedWastagePct: bestPlan?.projectedWastagePct ?? 100,
         impliedPricePerKg,
       };
     });
-  }, [orderHistory]);
+  }, [orderHistory, strategyCatalog]);
 
   const fishSourceMeta = useMemo(
     () => ({
@@ -465,6 +599,54 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
     };
   }, [activeScenarioView, isImplementedMixActive, mlPrediction]);
 
+  const executionTransparency = useMemo(() => {
+    if (!selectedScenario) {
+      return null;
+    }
+
+    const baseRevenue = selectedScenario.projectedRevenue ?? 0;
+    const baseCost = selectedScenario.projectedCost ?? 0;
+    const baseProfit = selectedScenario.projectedProfit ?? 0;
+    const baseWastageKg = selectedScenario.wastageKg;
+
+    const recoveryActive = Boolean(isImplementedMixActive && selectedRecoveryPlan && blendedPlanView);
+    const recoveryRevenue = selectedRecoveryPlan?.additionalRevenue ?? 0;
+    const recoveryCost = selectedRecoveryPlan?.additionalCost ?? 0;
+    const recoveryProfit = selectedRecoveryPlan?.additionalProfit ?? 0;
+    const recoveredKg = selectedRecoveryPlan?.recoveredKg ?? 0;
+    const residualWasteKg = recoveryActive ? Math.max(0, baseWastageKg - recoveredKg) : baseWastageKg;
+
+    const finalRevenue = recoveryActive && blendedPlanView ? blendedPlanView.blendedRevenue : baseRevenue;
+    const finalCost = recoveryActive && blendedPlanView ? blendedPlanView.blendedCost : baseCost;
+    const finalProfit = recoveryActive && blendedPlanView ? blendedPlanView.blendedProfit : baseProfit;
+
+    const baseDestination = CHANNEL_DESTINATION[selectedScenario.option.channel];
+    const recoveryDestination = selectedRecoveryPlan
+      ? CHANNEL_DESTINATION[
+          (strategyCatalog.find((s) => s.id === selectedRecoveryPlan.id)?.channel ?? selectedScenario.option.channel) as
+            'Customer' | 'Restaurant' | 'Retail' | 'Industrial'
+        ]
+      : null;
+
+    return {
+      recoveryActive,
+      baseRevenue,
+      baseCost,
+      baseProfit,
+      finalRevenue,
+      finalCost,
+      finalProfit,
+      recoveryRevenue,
+      recoveryCost,
+      recoveryProfit,
+      recoveredKg,
+      residualWasteKg,
+      baseWastageKg,
+      baseDestination,
+      recoveryDestination,
+    };
+  }, [selectedScenario, isImplementedMixActive, selectedRecoveryPlan, blendedPlanView, strategyCatalog]);
+
   useEffect(() => {
     if (selectedStockScenarios.length) {
       setSelectedOptionId(selectedStockScenarios[0].option.id);
@@ -522,6 +704,8 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
       return;
     }
 
+    const insightRunId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
     setAiLoading(true);
     setAiError('');
 
@@ -549,6 +733,20 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
           feasible: scenario.feasible,
           projectedProfit: scenario.projectedProfit,
         })),
+        implementationState: isImplementedMixActive
+          ? 'implemented'
+          : selectedRecoveryPlan && blendedPlanView
+            ? 'preview'
+            : 'none',
+        recoveryPlanLabel: selectedRecoveryPlan?.label,
+        baseDestination: executionTransparency?.baseDestination,
+        recoveryDestination: executionTransparency?.recoveryDestination ?? undefined,
+        baseProfit: executionTransparency?.baseProfit,
+        finalProfit: executionTransparency?.finalProfit,
+        baseWastageKg: executionTransparency?.baseWastageKg,
+        residualWasteKg: executionTransparency?.residualWasteKg,
+        recoveredKg: executionTransparency?.recoveredKg,
+        requestId: insightRunId,
       });
       setAiInsight(text);
     } catch (error: any) {
@@ -558,16 +756,62 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
     }
   };
 
-  const exportLogs = () => {
-    const payload = JSON.stringify(metrics ?? { fallback: true }, null, 2);
-    const blob = new Blob([payload], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'launchos-dashboard-logs.json';
-    link.click();
-    URL.revokeObjectURL(url);
-    setStatus('Dashboard logs exported.');
+  const exportLogs = async () => {
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      let jsPDFAutoTable;
+      try {
+        jsPDFAutoTable = await import('jspdf-autotable');
+      } catch (e) {
+        // autotable not available, we will fallback
+      }
+
+      const doc = new jsPDF();
+      doc.setFontSize(18);
+      doc.text('Live Reservations Feed', 14, 20);
+
+      const reservations = metrics?.live_reservations || [];
+
+      if (jsPDFAutoTable && jsPDFAutoTable.default) {
+        const autoTable = jsPDFAutoTable.default;
+        const tableColumn = ["Order ID", "Customer", "Apartment", "Product", "Qty (kg)", "Total", "Freshness", "Date"];
+        const tableRows = reservations.map(r => [
+          r.order_id.substring(0, 8),
+          r.customer_name,
+          r.apartment_name,
+          r.product_name,
+          r.quantity_kg,
+          `₹${r.total_amount}`,
+          `${r.freshness_score}/100`,
+          new Date(r.created_at).toLocaleString()
+        ]);
+        autoTable(doc, {
+          head: [tableColumn],
+          body: tableRows,
+          startY: 30,
+        });
+      } else {
+        doc.setFontSize(10);
+        let y = 30;
+        doc.text('Order ID | Customer | Apartment | Product | Qty | Total | Freshness', 14, y);
+        y += 8;
+        reservations.forEach((r) => {
+          if (y > 280) {
+            doc.addPage();
+            y = 20;
+          }
+          const text = `${r.order_id.slice(0, 6)} | ${r.customer_name.substring(0,10)} | ${r.apartment_name.substring(0,12)} | ${r.product_name.substring(0,10)} | ${r.quantity_kg}kg | ₹${r.total_amount} | ${r.freshness_score}`;
+          doc.text(text, 14, y);
+          y += 6;
+        });
+      }
+
+      doc.save('launchos-reservations.pdf');
+      setStatus('Dashboard logs exported as PDF.');
+    } catch (error) {
+      console.error("Failed to generate PDF", error);
+      setStatus('Failed to generate PDF.');
+    }
   };
   return (
     <div className="space-y-12">
@@ -840,9 +1084,44 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
             <h3 className="text-lg font-bold text-primary">Current Orders & Daily Commitments</h3>
             <span className="text-xs font-bold text-primary uppercase tracking-widest">Operations</span>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <div className="rounded-lg border border-slate-200 p-3 bg-surface-container-low">
+              <p className="text-[10px] uppercase tracking-widest font-black text-slate-500">Total Daily Commitments</p>
+              <p className="text-lg font-black text-primary mt-1">{operationsSummary.totalCommitmentKg.toFixed(1)}kg</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3 bg-surface-container-low">
+              <p className="text-[10px] uppercase tracking-widest font-black text-slate-500">Supply Shortfall</p>
+              <p className={cn('text-lg font-black mt-1', operationsSummary.totalShortfallKg > 0 ? 'text-rose-600' : 'text-emerald-600')}>
+                {operationsSummary.totalShortfallKg.toFixed(1)}kg
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-200 p-3 bg-surface-container-low">
+              <p className="text-[10px] uppercase tracking-widest font-black text-slate-500">At-Risk Commitments</p>
+              <p className={cn('text-lg font-black mt-1', operationsSummary.atRiskCount > 0 ? 'text-amber-600' : 'text-emerald-600')}>
+                {operationsSummary.atRiskCount}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 mb-5">
+            {(['All', 'AtRisk', 'High', 'Medium', 'Low'] as const).map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setOperationsFilter(item)}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-widest border transition-colors',
+                  operationsFilter === item
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-white text-primary border-slate-200 hover:border-primary/40'
+                )}
+              >
+                {item === 'AtRisk' ? 'At Risk' : item}
+              </button>
+            ))}
+          </div>
           <div className="space-y-4 mb-6">
-            {commitments.map((commitment) => (
-              <div key={commitment.id} className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/20">
+            {filteredCommitments.map((commitment) => (
+              <div key={commitment.id} className={cn('p-3 rounded-xl bg-surface-container-low border border-outline-variant/20', commitment.atRisk ? 'ring-1 ring-amber-200' : '')}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-bold text-primary">{commitment.buyerName}</p>
@@ -856,8 +1135,72 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
                   <span>Daily {commitment.dailyQtyKg}kg</span>
                   <span>{formatCurrency(commitment.agreedPricePerKg)}/kg</span>
                 </div>
+                <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+                  <p className="text-slate-600">Available: <strong>{commitment.availableKg.toFixed(1)}kg</strong></p>
+                  <p className={cn(commitment.shortfallKg > 0 ? 'text-rose-600' : 'text-emerald-600')}>
+                    {commitment.shortfallKg > 0 ? `Shortfall: ${commitment.shortfallKg.toFixed(1)}kg` : `Surplus: ${commitment.surplusKg.toFixed(1)}kg`}
+                  </p>
+                  <p className={cn(commitment.marginPerKg < 0 ? 'text-rose-600' : 'text-slate-600')}>
+                    Margin: <strong>{formatCurrency(commitment.marginPerKg)}/kg</strong>
+                  </p>
+                  <p className="text-slate-600">Route: <strong>{commitment.bestRouteLabel}</strong></p>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      applyCommitmentAction(commitment.id, 'prioritized');
+                      setStatus(`Commitment prioritized: ${commitment.buyerName}`);
+                    }}
+                    className="px-2.5 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest border border-slate-300 text-primary hover:bg-white"
+                  >
+                    Prioritize
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (commitment.stockId) {
+                        setSelectedStockId(commitment.stockId);
+                      }
+                      if (commitment.bestRouteId) {
+                        setSelectedOptionId(commitment.bestRouteId);
+                      }
+                      applyCommitmentAction(commitment.id, 'routed-to-best-path');
+                      setStatus(`Routed ${commitment.species} to ${commitment.bestRouteLabel} for ${commitment.buyerName}`);
+                    }}
+                    className="px-2.5 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest border border-slate-300 text-primary hover:bg-white"
+                  >
+                    Route To Best Path
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      applyCommitmentAction(commitment.id, 'price-adjustment-suggested', {
+                        suggestedPricePerKg: commitment.suggestedPricePerKg,
+                      });
+                      setStatus(`Suggested revised price for ${commitment.buyerName}: ${formatCurrency(commitment.suggestedPricePerKg)}/kg`);
+                    }}
+                    className="px-2.5 py-1.5 rounded-md text-[10px] font-black uppercase tracking-widest border border-slate-300 text-primary hover:bg-white"
+                  >
+                    Suggest Price
+                  </button>
+                </div>
+                {commitmentActionState[commitment.id] && (
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    Last action: <strong>{commitmentActionState[commitment.id].lastAction}</strong>
+                    {commitmentActionState[commitment.id].suggestedPricePerKg
+                      ? ` • Suggested ${formatCurrency(commitmentActionState[commitment.id].suggestedPricePerKg)}/kg`
+                      : ''}
+                    {' '}• {new Date(commitmentActionState[commitment.id].at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
               </div>
             ))}
+            {!filteredCommitments.length && (
+              <div className="p-3 rounded-xl border border-dashed border-slate-300 text-sm text-slate-500">
+                No commitments match the current operations filter.
+              </div>
+            )}
           </div>
           <div className="p-3 rounded-xl bg-primary text-white">
             <p className="text-[10px] uppercase tracking-widest font-black opacity-70">Current Orders (Last 24h)</p>
@@ -1143,6 +1486,77 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
           </div>
         )}
 
+        {selectedScenario && executionTransparency && (
+          <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-slate-500">Execution Transparency</p>
+                <p className="text-sm text-slate-600 mt-1">Shows how fish volume is split, where it goes, and how money is generated in base plus recovery flow.</p>
+              </div>
+              <span
+                className={cn(
+                  'text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full',
+                  executionTransparency.recoveryActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
+                )}
+              >
+                {executionTransparency.recoveryActive ? 'Recovery Mix Implemented' : 'Base Strategy Only'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="rounded-lg border border-slate-200 p-3 bg-surface-container-low">
+                <p className="text-[10px] uppercase tracking-widest font-black text-slate-500">Primary Route</p>
+                <p className="text-sm font-black text-primary mt-1">{selectedScenario.option.label}</p>
+                <p className="text-xs text-slate-600 mt-1">Destination: {executionTransparency.baseDestination}</p>
+                <p className="text-xs text-slate-600 mt-1">Fish Allocated: <strong>{selectedScenario.fulfillmentKg.toFixed(1)}kg</strong></p>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 p-3 bg-surface-container-low">
+                <p className="text-[10px] uppercase tracking-widest font-black text-slate-500">Secondary Route</p>
+                <p className="text-sm font-black text-primary mt-1">{selectedRecoveryPlan?.label ?? 'Not selected'}</p>
+                <p className="text-xs text-slate-600 mt-1">Destination: {executionTransparency.recoveryDestination ?? 'No secondary destination yet'}</p>
+                <p className="text-xs text-slate-600 mt-1">Recovered Fish: <strong>{selectedRecoveryPlan ? `${executionTransparency.recoveredKg.toFixed(1)}kg` : '0.0kg'}</strong></p>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 p-3 bg-surface-container-low">
+                <p className="text-[10px] uppercase tracking-widest font-black text-slate-500">Residual / Loss</p>
+                <p className="text-sm font-black text-primary mt-1">Unrecovered Fish</p>
+                <p className="text-xs text-slate-600 mt-1">Before Recovery: {executionTransparency.baseWastageKg.toFixed(1)}kg</p>
+                <p className="text-xs text-slate-600 mt-1">After Recovery: <strong>{executionTransparency.residualWasteKg.toFixed(1)}kg</strong></p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="rounded-lg border border-slate-200 p-3 bg-slate-50">
+                <p className="text-[10px] uppercase tracking-widest font-black text-slate-500">Base Strategy P&L</p>
+                <p className="text-xs text-slate-700 mt-2">Revenue: <strong>{formatCurrency(executionTransparency.baseRevenue)}</strong></p>
+                <p className="text-xs text-slate-700">Cost: <strong>{formatCurrency(executionTransparency.baseCost)}</strong></p>
+                <p className="text-xs text-slate-700">Profit: <strong>{formatCurrency(executionTransparency.baseProfit)}</strong></p>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 p-3 bg-slate-50">
+                <p className="text-[10px] uppercase tracking-widest font-black text-slate-500">Recovery Add-on P&L</p>
+                <p className="text-xs text-slate-700 mt-2">Added Revenue: <strong>{formatCurrency(executionTransparency.recoveryRevenue)}</strong></p>
+                <p className="text-xs text-slate-700">Added Cost: <strong>{formatCurrency(executionTransparency.recoveryCost)}</strong></p>
+                <p className="text-xs text-slate-700">Added Profit: <strong>{formatCurrency(executionTransparency.recoveryProfit)}</strong></p>
+              </div>
+
+              <div className="rounded-lg border border-primary/20 p-3 bg-primary/5">
+                <p className="text-[10px] uppercase tracking-widest font-black text-primary">Final P&L (What Admin Earns)</p>
+                <p className="text-xs text-primary mt-2">Final Revenue: <strong>{formatCurrency(executionTransparency.finalRevenue)}</strong></p>
+                <p className="text-xs text-primary">Final Cost: <strong>{formatCurrency(executionTransparency.finalCost)}</strong></p>
+                <p className="text-xs text-primary">Final Profit: <strong>{formatCurrency(executionTransparency.finalProfit)}</strong></p>
+              </div>
+            </div>
+
+            {mlPrediction && !executionTransparency.recoveryActive && (
+              <p className="text-xs text-slate-500">
+                ML overlay currently adjusts displayed base estimate to {formatCurrency(mlPrediction.predicted_profit)} profit and {mlPrediction.predicted_wastage_pct.toFixed(1)}% wastage for this selected strategy.
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 rounded-xl border border-slate-200 bg-white">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Decision Confidence</p>
@@ -1190,7 +1604,7 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
                 aiLoading ? 'bg-slate-200 text-slate-500 cursor-not-allowed' : 'bg-primary text-white hover:bg-primary/90'
               )}
             >
-              {aiLoading ? 'Generating...' : 'Generate AI Insight'}
+              {aiLoading ? 'Generating...' : aiInsight ? 'Regenerate AI Insight' : 'Generate AI Insight'}
             </button>
           </div>
           {aiError && <p className="mt-3 text-xs font-semibold text-rose-600">{aiError}</p>}
