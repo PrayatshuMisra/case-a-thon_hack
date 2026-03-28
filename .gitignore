@@ -21,6 +21,8 @@ __pycache__/
 backend/venv/
 backend/__pycache__/
 backend/*.db
+backend/ml_models/pilot_model.joblib
+backend/ml_models/
 
 # Node
 node_modules/
