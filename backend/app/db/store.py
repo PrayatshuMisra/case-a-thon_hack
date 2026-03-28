@@ -49,7 +49,8 @@ def _seed_shipments() -> list[dict[str, Any]]:
     now = now_utc()
     return [
         {
-            "id": str(uuid4()),
+            # Fixed UUID matches Supabase seed — required for FK on orders.shipment_id
+            "id": "11111111-1111-4111-8111-111111111111",
             "product_name": "Seer Fish",
             "source_boat": "MALPE-07",
             "catch_time": now - timedelta(hours=4, minutes=15),
@@ -62,7 +63,7 @@ def _seed_shipments() -> list[dict[str, Any]]:
             "created_at": now,
         },
         {
-            "id": str(uuid4()),
+            "id": "22222222-2222-4222-8222-222222222222",
             "product_name": "Pomfret",
             "source_boat": "MALPE-12",
             "catch_time": now - timedelta(hours=5, minutes=10),
@@ -75,7 +76,7 @@ def _seed_shipments() -> list[dict[str, Any]]:
             "created_at": now,
         },
         {
-            "id": str(uuid4()),
+            "id": "33333333-3333-4333-8333-333333333333",
             "product_name": "Prawns",
             "source_boat": "MALPE-19",
             "catch_time": now - timedelta(hours=6, minutes=5),

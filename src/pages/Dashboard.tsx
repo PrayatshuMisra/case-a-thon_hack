@@ -134,9 +134,18 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
     ];
   }, [metrics]);
 
-  const areaData = range === '7D' ? (metrics?.charts.orders_over_time ?? data) : [...(metrics?.charts.orders_over_time ?? data), ...(metrics?.charts.orders_over_time ?? data), ...(metrics?.charts.orders_over_time ?? data), ...(metrics?.charts.orders_over_time ?? data).slice(0, 2)];
-  const apartmentDemandData = metrics?.charts.apartment_demand_split ?? demandData;
-  const productDemandData = (metrics?.charts.product_demand_split ?? productData).map((item, idx) => ({ ...item, color: (item as any).color ?? productData[idx % productData.length].color }));
+  const areaData = (() => {
+    const base = metrics?.charts.orders_over_time;
+    const src = (base && base.length > 0) ? base : data;
+    return range === '7D' ? src : [...src, ...src, ...src, ...src.slice(0, 2)];
+  })();
+  const apartmentDemandData = (metrics?.charts.apartment_demand_split?.length)
+    ? metrics.charts.apartment_demand_split
+    : demandData;
+  const productDemandData = ((metrics?.charts.product_demand_split?.length)
+    ? metrics.charts.product_demand_split
+    : productData
+  ).map((item: any, idx: number) => ({ ...item, color: item.color ?? productData[idx % productData.length].color }));
 
   const localityPoints: RoutePoint[] = [
     { lat: 13.3409, lng: 74.7421, label: 'Malpe Harbor', subtitle: 'Source Cluster', status: 'done' },
@@ -735,11 +744,14 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
 
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col">
           <h3 className="text-lg font-bold text-primary mb-6">Apartment Demand Split</h3>
-          <div className="flex-1">
+          <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={apartmentDemandData}>
-                <Bar dataKey="value" fill="#003366" radius={[4, 4, 0, 0]} />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700}} />
+              <BarChart data={apartmentDemandData} barCategoryGap="30%">
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#94a3b8'}} width={30} />
+                <Tooltip formatter={(v: any) => [`${v} kg`, 'Volume']} />
+                <Bar dataKey="value" fill="#003366" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

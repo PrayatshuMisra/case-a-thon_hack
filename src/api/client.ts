@@ -131,6 +131,19 @@ export type ExperimentLogResponse = {
   next_best_arm_id: string;
 };
 
+export type ModelTractionScoreComponent = {
+  name: string;
+  score: number;
+  label: string;
+};
+
+export type ModelTractionScore = {
+  generated_at: string;
+  traction_score: number;
+  components: ModelTractionScoreComponent[];
+  notes: string[];
+};
+
 export const api = {
   getLiveDrop: () => request<{ products: LiveDropProduct[]; trust_signals: string[] }>('/api/live-drop'),
 
@@ -184,6 +197,8 @@ export const api = {
   getTracking: (orderId: string) => request<any>(`/api/order-tracking/${orderId}`),
 
   getTomorrowRecommendation: () => request<TomorrowRecommendation>('/api/recommendation/tomorrow'),
+
+  getModelTractionScore: () => request<ModelTractionScore>('/api/model/traction-score'),
 
   logExperiment: (payload: {
     arm_id: string;

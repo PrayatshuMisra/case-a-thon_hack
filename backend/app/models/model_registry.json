@@ -40,11 +40,15 @@
       "test-arm-A": {
         "alpha": 11.0,
         "beta": 91.0
+      },
+      "whitefield-prawns-chef": {
+        "alpha": 93.0,
+        "beta": 9.0
       }
     }
   },
   "meta": {
     "version": "v1",
-    "trained_on": "2026-03-28T19:14:29.177464+00:00"
+    "trained_on": "2026-03-28T20:18:32.504681+00:00"
   }
 }
