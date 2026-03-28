@@ -6,3 +6,29 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+.env
+
+# Backend
+backend/venv/
+backend/__pycache__/
+backend/*.db
+
+# Node
+node_modules/
+dist/
+build/
+
+# OS / IDE
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
