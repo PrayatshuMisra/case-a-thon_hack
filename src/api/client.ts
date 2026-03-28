@@ -89,6 +89,14 @@ export type DashboardMetrics = {
   };
 };
 
+export type MlScenarioPrediction = {
+  model_version: string;
+  feasible_probability: number;
+  predicted_profit: number;
+  predicted_wastage_pct: number;
+  recommended_action: string;
+};
+
 export const api = {
   getLiveDrop: () => request<{ products: LiveDropProduct[]; trust_signals: string[] }>('/api/live-drop'),
 
@@ -140,4 +148,18 @@ export const api = {
   getLois: () => request<Array<any>>('/api/lois'),
 
   getTracking: (orderId: string) => request<any>(`/api/order-tracking/${orderId}`),
+
+  predictMlScenario: (payload: {
+    species: string;
+    strategy_id: string;
+    freshness_score: number;
+    health_score: number;
+    available_kg: number;
+    forecast_demand_kg: number;
+    base_price_per_kg: number;
+    cold_chain_maintained: boolean;
+  }) => request<MlScenarioPrediction>('/api/ml/predict-scenario', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
 };

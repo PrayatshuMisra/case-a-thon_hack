@@ -1,0 +1,1 @@
+const fs = require('fs'); let c = fs.readFileSync('src/pages/Home.tsx', 'utf-8'); c = c.replace(/return \(\) => window.removeEventListener(?:[\s\S]*?)return \(/, 'return ('); fs.writeFileSync('src/pages/Home.tsx', c);
