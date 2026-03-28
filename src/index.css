@@ -1,5 +1,5 @@
-@import "tailwindcss";
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap');
+@import "tailwindcss";
 
 @theme {
   --font-manrope: "Manrope", sans-serif;
@@ -22,14 +22,36 @@
 @layer base {
   body {
     @apply bg-surface text-on-surface font-inter antialiased;
+    background-image:
+      radial-gradient(circle at 15% 15%, rgba(0, 106, 106, 0.1) 0%, transparent 30%),
+      radial-gradient(circle at 85% 10%, rgba(0, 30, 64, 0.12) 0%, transparent 35%),
+      radial-gradient(circle at 70% 90%, rgba(61, 14, 0, 0.06) 0%, transparent 25%);
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-manrope;
   }
 }
 
+@layer components {
+  .premium-card {
+    @apply bg-white/90 backdrop-blur-lg border border-white/60 shadow-[0_20px_60px_-25px_rgba(0,30,64,0.35)] rounded-3xl;
+  }
+
+  .premium-hover {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_80px_-25px_rgba(0,30,64,0.45)];
+  }
+}
+
 .glass-effect {
   @apply backdrop-blur-xl bg-white/10 border border-white/10;
+}
+
+.leaflet-container {
+  font-family: "Inter", sans-serif;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 12px;
 }
 
 .no-scrollbar::-webkit-scrollbar {

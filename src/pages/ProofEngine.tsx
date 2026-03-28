@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { 
   ShieldCheck, 
   Users, 
@@ -13,15 +13,34 @@ import {
   ArrowDown
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
+import { api, type DashboardMetrics } from '@/src/api/client';
 
 export const ProofEngine = () => {
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+
+  useEffect(() => {
+    api.getDashboardMetrics().then(setMetrics).catch(() => {});
+  }, []);
+
+  const proof = metrics?.investor_proof;
+  const readiness = useMemo(() => {
+    if (!proof) return ['STRONG', 'STRONG', 'STRONG', 'STRONG', 'STRONG'];
+    return [
+      proof.readiness.launch ?? 'STRONG',
+      proof.readiness.logistics ?? 'STRONG',
+      proof.readiness.demand ?? 'STRONG',
+      proof.readiness.supply ?? 'STRONG',
+      proof.readiness.proof ?? 'STRONG',
+    ].map((r) => String(r).toUpperCase());
+  }, [proof]);
+
   return (
     <div className="max-w-7xl mx-auto space-y-12">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
           <div className="inline-flex items-center px-3 py-1 bg-secondary-container text-primary rounded-full text-xs font-bold tracking-tight uppercase">
             <span className="w-2 h-2 rounded-full bg-secondary mr-2 animate-pulse"></span>
-            Pilot Status: Investor-Ready
+            Pilot Status: {proof?.pilot_status ?? 'Investor-Ready'}
           </div>
           <h1 className="text-4xl lg:text-5xl font-extrabold font-manrope tracking-tighter text-primary">
             LaunchOS Proof Engine
@@ -33,7 +52,7 @@ export const ProofEngine = () => {
         <div className="bg-white p-4 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,30,64,0.06)] flex items-center gap-4">
           <div className="text-right">
             <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Evidence Strength</p>
-            <p className="text-2xl font-black text-secondary">92<span className="text-sm font-medium text-on-surface-variant">/100</span></p>
+            <p className="text-2xl font-black text-secondary">{Math.round(metrics?.investor_readiness.overall_proof_score ?? 92)}<span className="text-sm font-medium text-on-surface-variant">/100</span></p>
           </div>
           <div className="w-12 h-12 rounded-full border-4 border-secondary-container flex items-center justify-center relative">
             <ShieldCheck className="text-secondary" size={24} />
@@ -42,7 +61,7 @@ export const ProofEngine = () => {
       </header>
 
       <section className="grid grid-cols-1 md:grid-cols-12 gap-6">
-        <div className="md:col-span-7 bg-white rounded-[2rem] p-8 shadow-[0_10px_40px_-10px_rgba(0,30,64,0.06)] relative overflow-hidden group">
+        <div className="md:col-span-7 premium-card p-8 premium-hover relative overflow-hidden group">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-primary">
               <Users size={20} />
@@ -52,24 +71,24 @@ export const ProofEngine = () => {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
             <div>
               <p className="text-xs text-on-surface-variant font-semibold mb-1">Total Reservations</p>
-              <p className="text-3xl font-black text-primary">1,240</p>
+              <p className="text-3xl font-black text-primary">{proof?.total_reservations ?? '1,240'}</p>
             </div>
             <div>
               <p className="text-xs text-on-surface-variant font-semibold mb-1">Communities</p>
-              <p className="text-3xl font-black text-primary">14</p>
+              <p className="text-3xl font-black text-primary">{proof?.apartment_communities ?? 14}</p>
             </div>
             <div>
               <p className="text-xs text-on-surface-variant font-semibold mb-1">Avg Basket</p>
-              <p className="text-3xl font-black text-primary">₹980</p>
+              <p className="text-3xl font-black text-primary">₹{proof?.average_basket_value ?? 980}</p>
             </div>
             <div>
               <p className="text-xs text-on-surface-variant font-semibold mb-1">Total Weight</p>
-              <p className="text-3xl font-black text-primary">840kg</p>
+              <p className="text-3xl font-black text-primary">{proof?.total_kg_reserved ?? 840}kg</p>
             </div>
           </div>
           <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between">
             <span className="text-sm font-medium text-on-surface-variant">Primary Locality Focus</span>
-            <span className="px-4 py-1.5 bg-secondary-container text-primary rounded-full text-sm font-bold">Whitefield, Bengaluru</span>
+            <span className="px-4 py-1.5 bg-secondary-container text-primary rounded-full text-sm font-bold">{proof?.top_locality ?? 'Whitefield, Bengaluru'}</span>
           </div>
         </div>
 
@@ -84,14 +103,14 @@ export const ProofEngine = () => {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <span className="text-secondary-container font-medium">LOIs Generated</span>
-                <span className="text-4xl font-black">6</span>
+                <span className="text-4xl font-black">{proof?.lois_generated ?? 6}</span>
               </div>
               <div className="bg-white/5 p-4 rounded-2xl">
                 <p className="text-[10px] uppercase font-bold tracking-widest text-secondary-container mb-3">Buyer Type Mix</p>
                 <div className="flex flex-wrap gap-2">
-                  <span className="px-3 py-1 bg-white/10 rounded-lg text-xs font-semibold">RWA</span>
-                  <span className="px-3 py-1 bg-white/10 rounded-lg text-xs font-semibold">Restaurant</span>
-                  <span className="px-3 py-1 bg-white/10 rounded-lg text-xs font-semibold">Export</span>
+                  {(proof ? Object.keys(proof.buyer_type_mix) : ['RWA', 'Restaurant', 'Export']).map((name) => (
+                    <span key={name} className="px-3 py-1 bg-white/10 rounded-lg text-xs font-semibold">{name}</span>
+                  ))}
                 </div>
               </div>
             </div>
@@ -122,15 +141,15 @@ export const ProofEngine = () => {
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center">
-              <p className="text-3xl font-black text-primary">14</p>
+              <p className="text-3xl font-black text-primary">{proof?.fishers_onboarded ?? 14}</p>
               <p className="text-[10px] text-on-surface-variant font-bold uppercase mt-1">Fishers Onboarded</p>
             </div>
             <div className="text-center">
-              <p className="text-3xl font-black text-primary">3,200kg</p>
+              <p className="text-3xl font-black text-primary">{proof?.weekly_supply_committed ?? 3200}kg</p>
               <p className="text-[10px] text-on-surface-variant font-bold uppercase mt-1">Weekly Supply</p>
             </div>
             <div className="text-center">
-              <p className="text-3xl font-black text-primary">240kg</p>
+              <p className="text-3xl font-black text-primary">{proof?.avg_catch_per_fisher ?? 240}kg</p>
               <p className="text-[10px] text-on-surface-variant font-bold uppercase mt-1">Avg Catch/Fisher</p>
             </div>
           </div>
@@ -139,7 +158,7 @@ export const ProofEngine = () => {
           </div>
         </div>
 
-        <div className="md:col-span-6 bg-white rounded-[2rem] p-8 shadow-[0_10px_40px_-10px_rgba(0,30,64,0.06)] flex flex-col justify-between">
+        <div className="md:col-span-6 premium-card p-8 premium-hover flex flex-col justify-between">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 rounded-lg bg-secondary-container flex items-center justify-center text-primary">
               <Award size={20} />
@@ -147,26 +166,29 @@ export const ProofEngine = () => {
             <h3 className="text-xl font-bold font-manrope text-primary">Trust Proof</h3>
           </div>
           <div className="space-y-6">
-            {[
-              { label: 'Avg Freshness Score', val: '94.2%', icon: Award },
-              { label: 'Provenance Visibility', val: '100%', icon: ShieldCheck },
-              { label: 'Cold-chain Confidence', val: 'HIGH', badge: true },
-              { label: 'Spoilage Reduction', val: '22%', down: true },
-            ].map((item, i) => (
-              <div key={i} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <item.icon size={18} className="text-secondary" />
-                  <span className="text-sm font-semibold text-on-surface">{item.label}</span>
-                </div>
-                {item.badge ? (
-                  <span className="px-3 py-1 bg-secondary-container text-primary rounded text-xs font-black">HIGH</span>
-                ) : (
-                  <span className="text-lg font-black text-primary">
-                    {item.val} {item.down && <ArrowDown size={14} className="inline text-secondary" />}
-                  </span>
-                )}
-              </div>
-            ))}
+              {[
+                { label: 'Avg Freshness Score', val: `${proof?.avg_freshness_score ?? 94.2}%`, icon: Award },
+                { label: 'Provenance Visibility', val: proof?.provenance_visibility ?? '100%', icon: ShieldCheck },
+                { label: 'Cold-chain Confidence', val: proof?.cold_chain_confidence ?? 'HIGH', badge: true, icon: ShieldCheck },
+                { label: 'Spoilage Reduction', val: proof?.spoilage_prevention ?? '22%', down: true },
+              ].map((item, i) => {
+                const Icon = item.icon ?? Award;
+                return (
+                  <div key={i} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Icon size={18} className="text-secondary" />
+                      <span className="text-sm font-semibold text-on-surface">{item.label}</span>
+                    </div>
+                    {item.badge ? (
+                      <span className="px-3 py-1 bg-secondary-container text-primary rounded text-xs font-black">HIGH</span>
+                    ) : (
+                      <span className="text-lg font-black text-primary">
+                        {item.val} {item.down && <ArrowDown size={14} className="inline text-secondary" />}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
           </div>
         </div>
       </section>
@@ -189,7 +211,7 @@ export const ProofEngine = () => {
                 <p className="text-[10px] font-bold uppercase tracking-tighter opacity-70">{item.label}</p>
                 <p className="font-black text-lg">Ready</p>
               </div>
-              <div className="text-[10px] font-bold px-2 py-0.5 bg-secondary-container text-primary rounded group-hover:bg-white/20 group-hover:text-white">STRONG</div>
+              <div className="text-[10px] font-bold px-2 py-0.5 bg-secondary-container text-primary rounded group-hover:bg-white/20 group-hover:text-white">{readiness[i]}</div>
             </div>
           ))}
         </div>

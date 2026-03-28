@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Ship, 
   MapPin, 
@@ -15,8 +15,41 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
+import { api } from '@/src/api/client';
+import { LiveRouteMap, type RoutePoint } from '@/src/components/LiveRouteMap';
 
-export const Logistics = () => {
+export const Logistics = ({ onNavigate, orderId }: { onNavigate?: (tab: string) => void; orderId?: string | null }) => {
+  const [tracking, setTracking] = useState<any>(null);
+  const [info, setInfo] = useState('');
+
+  useEffect(() => {
+    if (!orderId) {
+      setInfo('No active order selected. Reserve from home to enable live tracking.');
+      return;
+    }
+    api.getTracking(orderId)
+      .then((data) => {
+        setTracking(data);
+        setInfo(`Tracking loaded for order ${orderId.slice(0, 8)}...`);
+      })
+      .catch(() => setInfo('Unable to fetch tracking details right now.'));
+  }, [orderId]);
+
+  const timeline = tracking?.timeline ?? [
+    { label: 'Landed at Malpe Harbor', sub: 'Verified landing at MAL-74 Sea King berth.', time: '04:12 AM', done: true },
+    { label: 'Quality Hub Inbound', sub: 'Initial grading and freshness assessment complete.', time: '05:45 AM', done: true },
+    { label: 'Processing & Packing', sub: 'Cleaned, cut, and vacuum-sealed at 2°C.', time: '08:20 AM', done: true },
+    { label: 'Cold-Chain Transit', sub: 'Vehicle MH-04-AX-2912 dispatched to Bangalore.', time: '10:30 AM', current: true },
+    { label: 'Urban Hub Arrival', sub: 'Expected arrival at Whitefield Distribution Node.', time: '04:00 AM', pending: true },
+  ];
+
+  const routePoints: RoutePoint[] = [
+    { lat: 13.3409, lng: 74.7421, label: 'Malpe Harbor', subtitle: 'Catch landed', status: 'done' },
+    { lat: 13.0087, lng: 74.7973, label: 'Mangalore Cold Node', subtitle: 'Quality hub', status: 'done' },
+    { lat: 12.9092, lng: 75.7928, label: 'Sakleshpur Transit', subtitle: 'Mountain corridor', status: 'current' },
+    { lat: 12.9716, lng: 77.5946, label: 'Bangalore Hub', subtitle: 'Urban distribution', status: 'upcoming' },
+    { lat: 12.9698, lng: 77.7500, label: tracking?.apartment_name ?? 'Whitefield Community', subtitle: 'Final delivery cluster', status: 'upcoming' },
+  ];
   return (
     <div className="max-w-7xl mx-auto space-y-12">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -35,6 +68,14 @@ export const Logistics = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Main Tracking Card */}
         <div className="lg:col-span-8 space-y-8">
+          <div className="premium-card p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-black text-primary">Live Route Intelligence</h3>
+              <span className="text-xs font-bold uppercase tracking-widest text-secondary">Leaflet Live</span>
+            </div>
+            <LiveRouteMap points={routePoints} />
+          </div>
+
           <div className="bg-white rounded-[2.5rem] p-10 shadow-[0_20px_60px_-15px_rgba(0,30,64,0.08)] border border-slate-100 relative overflow-hidden">
             <div className="flex flex-col md:flex-row justify-between items-start mb-12 gap-8">
               <div className="space-y-4">
@@ -42,7 +83,7 @@ export const Logistics = () => {
                   Order Status: In Transit
                 </div>
                 <h3 className="text-4xl font-manrope font-black text-primary">Your catch is reserved.</h3>
-                <p className="text-on-surface-variant max-w-md">Currently being processed at the Malpe Quality Hub. Expected delivery tomorrow by 7:00 AM.</p>
+                <p className="text-on-surface-variant max-w-md">{tracking ? `Tracking ${tracking.product_name} for ${tracking.customer_name}. ETA: ${new Date(tracking.eta).toLocaleString()}` : 'Currently being processed at the Malpe Quality Hub. Expected delivery tomorrow by 7:00 AM.'}</p>
               </div>
               <div className="w-full md:w-auto bg-surface-container-low p-6 rounded-3xl flex items-center gap-6">
                 <img 
@@ -53,8 +94,8 @@ export const Logistics = () => {
                 />
                 <div>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Product Details</p>
-                  <p className="text-xl font-black text-primary">Seer Fish</p>
-                  <p className="text-xs font-bold text-secondary">1.2kg • Premium Cut</p>
+                  <p className="text-xl font-black text-primary">{tracking?.product_name ?? 'Seer Fish'}</p>
+                  <p className="text-xs font-bold text-secondary">{tracking ? `${tracking.quantity_kg}kg • ${tracking.freshness_label}` : '1.2kg • Premium Cut'}</p>
                 </div>
               </div>
             </div>
@@ -120,13 +161,7 @@ export const Logistics = () => {
               <div className="relative pl-10 space-y-10">
                 <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-slate-100"></div>
                 
-                {[
-                  { label: 'Landed at Malpe Harbor', sub: 'Verified landing at MAL-74 Sea King berth.', time: '04:12 AM', done: true },
-                  { label: 'Quality Hub Inbound', sub: 'Initial grading and freshness assessment complete.', time: '05:45 AM', done: true },
-                  { label: 'Processing & Packing', sub: 'Cleaned, cut, and vacuum-sealed at 2°C.', time: '08:20 AM', done: true },
-                  { label: 'Cold-Chain Transit', sub: 'Vehicle MH-04-AX-2912 dispatched to Bangalore.', time: '10:30 AM', current: true },
-                  { label: 'Urban Hub Arrival', sub: 'Expected arrival at Whitefield Distribution Node.', time: '04:00 AM', pending: true },
-                ].map((step, i) => (
+                {timeline.map((step: any, i: number) => (
                   <div key={i} className="relative">
                     <div className={cn(
                       "absolute -left-10 w-6 h-6 rounded-full border-4 border-white shadow-sm flex items-center justify-center",
@@ -137,9 +172,9 @@ export const Logistics = () => {
                     <div className="flex justify-between items-start">
                       <div>
                         <p className={cn("text-sm font-black", step.pending ? "text-slate-400" : "text-primary")}>{step.label}</p>
-                        <p className="text-xs font-medium text-on-surface-variant mt-1">{step.sub}</p>
+                        <p className="text-xs font-medium text-on-surface-variant mt-1">{step.sub ?? ''}</p>
                       </div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{step.time}</span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{step.time ?? (step.timestamp ? new Date(step.timestamp).toLocaleTimeString() : '--')}</span>
                     </div>
                   </div>
                 ))}
@@ -174,7 +209,7 @@ export const Logistics = () => {
               ))}
             </div>
             <div className="mt-8 pt-8 border-t border-white/10">
-              <button className="w-full py-4 bg-secondary text-white rounded-xl font-bold flex items-center justify-center gap-2">
+              <button onClick={() => onNavigate?.('proof')} className="w-full py-4 bg-secondary text-white rounded-xl font-bold flex items-center justify-center gap-2">
                 <ShieldCheck size={18} />
                 <span>View Full Proof Logs</span>
               </button>
@@ -220,6 +255,7 @@ export const Logistics = () => {
           </div>
         </div>
       </div>
+      {info && <p className="text-sm font-semibold text-primary">{info}</p>}
     </div>
   );
 };

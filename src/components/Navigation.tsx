@@ -60,11 +60,11 @@ export const Sidebar = ({ activeTab, setActiveTab }: SidebarProps) => {
       </nav>
 
       <div className="pt-6 border-t border-slate-200">
-        <button className="w-full py-3 px-4 bg-primary text-white rounded-xl font-bold text-sm shadow-lg shadow-primary/20 hover:scale-[0.98] transition-transform flex items-center justify-center gap-2">
+        <button onClick={() => setActiveTab('home')} className="w-full py-3 px-4 bg-primary text-white rounded-xl font-bold text-sm shadow-lg shadow-primary/20 hover:scale-[0.98] transition-transform flex items-center justify-center gap-2">
           <Plus size={16} />
           <span>New Seafood Drop</span>
         </button>
-        <button className="w-full flex items-center space-x-3 px-4 py-3 mt-4 text-slate-500 hover:bg-slate-100 transition-all duration-300 rounded-xl font-semibold text-sm">
+        <button onClick={() => window.open('https://github.com', '_blank', 'noopener,noreferrer')} className="w-full flex items-center space-x-3 px-4 py-3 mt-4 text-slate-500 hover:bg-slate-100 transition-all duration-300 rounded-xl font-semibold text-sm">
           <HelpCircle size={20} />
           <span>Help Support</span>
         </button>
@@ -73,7 +73,13 @@ export const Sidebar = ({ activeTab, setActiveTab }: SidebarProps) => {
   );
 };
 
-export const TopNav = ({ activeTab }: { activeTab: string }) => {
+export const TopNav = ({ activeTab, onNavigate }: { activeTab: string; onNavigate?: (tab: string) => void }) => {
+  const goTo = (tab: string) => {
+    onNavigate?.(tab);
+  };
+
+  const isInvestorsActive = activeTab === 'proof' || activeTab === 'investors';
+
   return (
     <nav className="bg-white/80 backdrop-blur-xl sticky top-0 z-50 shadow-[0_10px_40px_-10px_rgba(0,30,64,0.06)] border-b border-outline-variant/10">
       <div className="flex justify-between items-center w-full px-8 py-4 max-w-screen-2xl mx-auto">
@@ -81,16 +87,16 @@ export const TopNav = ({ activeTab }: { activeTab: string }) => {
           Malpe Meen
         </div>
         <div className="hidden md:flex items-center space-x-8 font-manrope tracking-tight font-bold">
-          <a className="text-slate-500 hover:text-primary transition-colors" href="#">Studio</a>
-          <a className={cn("transition-colors", activeTab === 'logistics' ? "text-primary border-b-2 border-primary pb-1" : "text-slate-500 hover:text-primary")} href="#">Logistics</a>
-          <a className="text-slate-500 hover:text-primary transition-colors" href="#">Pilots</a>
-          <a className="text-slate-500 hover:text-primary transition-colors" href="#">Investors</a>
+          <button onClick={() => goTo('home')} className={cn("transition-colors", activeTab === 'home' ? "text-primary border-b-2 border-primary pb-1" : "text-slate-500 hover:text-primary")}>Studio</button>
+          <button onClick={() => goTo('logistics')} className={cn("transition-colors", activeTab === 'logistics' ? "text-primary border-b-2 border-primary pb-1" : "text-slate-500 hover:text-primary")}>Logistics</button>
+          <button onClick={() => goTo('dashboard')} className={cn("transition-colors", activeTab === 'dashboard' ? "text-primary border-b-2 border-primary pb-1" : "text-slate-500 hover:text-primary")}>Pilots</button>
+          <button onClick={() => goTo('investors')} className={cn("transition-colors", isInvestorsActive ? "text-primary border-b-2 border-primary pb-1" : "text-slate-500 hover:text-primary")}>Investors</button>
         </div>
         <div className="flex items-center space-x-4">
-          <button className="p-2 hover:bg-slate-100 rounded-lg transition-all">
+          <button onClick={() => goTo('dashboard')} className="p-2 hover:bg-slate-100 rounded-lg transition-all">
             <Bell size={20} className="text-primary" />
           </button>
-          <button className="p-2 hover:bg-slate-100 rounded-lg transition-all">
+          <button onClick={() => goTo('logistics')} className="p-2 hover:bg-slate-100 rounded-lg transition-all">
             <Ship size={20} className="text-primary" />
           </button>
           <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-primary/10">

@@ -1,11 +1,9 @@
 from fastapi import APIRouter
 from app.services.metrics_service import get_dashboard_metrics
+from app.db.store import store
 
 router = APIRouter()
 
-@router.get("/metrics")
+@router.get("/api/dashboard-metrics")
 def get_metrics():
-    """
-    Retrieve operational dashboard metrics.
-    """
-    return get_dashboard_metrics()
+    return get_dashboard_metrics(store)

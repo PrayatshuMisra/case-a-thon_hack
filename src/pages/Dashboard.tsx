@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { 
   TrendingUp, 
   Users, 
@@ -26,6 +26,8 @@ import {
   Cell
 } from 'recharts';
 import { cn } from '@/src/lib/utils';
+import { api, type DashboardMetrics } from '@/src/api/client';
+import { LiveRouteMap, type RoutePoint } from '@/src/components/LiveRouteMap';
 
 const data = [
   { name: 'Mon', value: 400 },
@@ -50,7 +52,58 @@ const productData = [
   { name: 'Prawns', value: 20, color: '#611b00' },
 ];
 
-export const Dashboard = () => {
+export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }) => {
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [status, setStatus] = useState('');
+  const [range, setRange] = useState<'7D' | '30D'>('7D');
+
+  useEffect(() => {
+    api.getDashboardMetrics().then(setMetrics).catch(() => setStatus('Live metrics unavailable. Showing fallback values.'));
+  }, []);
+
+  const kpis = useMemo(() => {
+    if (!metrics) {
+      return [
+        { label: 'Daily Orders', value: '42', trend: '+12%', color: 'bg-secondary' },
+        { label: 'Revenue Captured', value: '₹52,400', sub: 'Awaiting Settlement' },
+        { label: 'Repeat Proxy', value: '68%', progress: true },
+        { label: 'Freshness Score', value: '94.2', sub: 'Premium Grade', icon: Award },
+        { label: 'Active Fishers', value: '14', sub: 'Malpe Harbor Cluster' },
+        { label: 'Signed LOIs', value: '6', sub: 'Ready for Studio', alert: true },
+      ];
+    }
+    return [
+      { label: 'Daily Orders', value: String(metrics.kpis.daily_orders), trend: '+Live', color: 'bg-secondary' },
+      { label: 'Revenue Captured', value: `₹${metrics.kpis.revenue_captured}`, sub: 'Awaiting Settlement' },
+      { label: 'Repeat Proxy', value: `${metrics.kpis.repeat_purchase_proxy}%`, progress: true },
+      { label: 'Freshness Score', value: String(metrics.kpis.avg_freshness), sub: 'Premium Grade', icon: Award },
+      { label: 'Active Fishers', value: String(metrics.kpis.active_fishers), sub: 'Malpe Harbor Cluster' },
+      { label: 'Signed LOIs', value: String(metrics.kpis.signed_lois), sub: 'Ready for Studio', alert: true },
+    ];
+  }, [metrics]);
+
+  const areaData = range === '7D' ? (metrics?.charts.orders_over_time ?? data) : [...(metrics?.charts.orders_over_time ?? data), ...(metrics?.charts.orders_over_time ?? data), ...(metrics?.charts.orders_over_time ?? data), ...(metrics?.charts.orders_over_time ?? data).slice(0, 2)];
+  const apartmentDemandData = metrics?.charts.apartment_demand_split ?? demandData;
+  const productDemandData = (metrics?.charts.product_demand_split ?? productData).map((item, idx) => ({ ...item, color: (item as any).color ?? productData[idx % productData.length].color }));
+
+  const localityPoints: RoutePoint[] = [
+    { lat: 13.3409, lng: 74.7421, label: 'Malpe Harbor', subtitle: 'Source Cluster', status: 'done' },
+    { lat: 12.9716, lng: 77.5946, label: 'Bangalore Urban Hub', subtitle: 'Central Dispatch', status: 'current' },
+    { lat: 12.9352, lng: 77.6245, label: 'HSR Layout', subtitle: 'High demand zone', status: 'upcoming' },
+    { lat: 12.9698, lng: 77.7500, label: 'Whitefield', subtitle: 'Subscriber towers', status: 'upcoming' },
+  ];
+
+  const exportLogs = () => {
+    const payload = JSON.stringify(metrics ?? { fallback: true }, null, 2);
+    const blob = new Blob([payload], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'launchos-dashboard-logs.json';
+    link.click();
+    URL.revokeObjectURL(url);
+    setStatus('Dashboard logs exported.');
+  };
   return (
     <div className="space-y-12">
       <header className="flex justify-between items-end">
@@ -76,14 +129,7 @@ export const Dashboard = () => {
       </header>
 
       <section className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
-        {[
-          { label: 'Daily Orders', value: '42', trend: '+12%', color: 'bg-secondary' },
-          { label: 'Revenue Captured', value: '₹52,400', sub: 'Awaiting Settlement' },
-          { label: 'Repeat Proxy', value: '68%', progress: true },
-          { label: 'Freshness Score', value: '94.2', sub: 'Premium Grade', icon: Award },
-          { label: 'Active Fishers', value: '14', sub: 'Malpe Harbor Cluster' },
-          { label: 'Signed LOIs', value: '6', sub: 'Ready for Studio', alert: true },
-        ].map((kpi, i) => (
+        {kpis.map((kpi, i) => (
           <div key={i} className="bg-surface-container-lowest p-5 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,30,64,0.06)] space-y-3">
             <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">{kpi.label}</p>
             <div className="flex items-baseline space-x-2">
@@ -117,13 +163,13 @@ export const Dashboard = () => {
           <div className="flex justify-between items-center mb-8">
             <h3 className="text-xl font-bold text-primary">Volume Trajectory</h3>
             <div className="flex space-x-2">
-              <span className="px-3 py-1 bg-white rounded-full text-[10px] font-bold text-primary shadow-sm cursor-pointer">7D</span>
-              <span className="px-3 py-1 text-[10px] font-bold text-slate-400 cursor-pointer">30D</span>
+              <button onClick={() => setRange('7D')} className={cn("px-3 py-1 rounded-full text-[10px] font-bold shadow-sm cursor-pointer", range === '7D' ? 'bg-white text-primary' : 'text-slate-400')}>7D</button>
+              <button onClick={() => setRange('30D')} className={cn("px-3 py-1 rounded-full text-[10px] font-bold shadow-sm cursor-pointer", range === '30D' ? 'bg-white text-primary' : 'text-slate-400')}>30D</button>
             </div>
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
+              <AreaChart data={areaData}>
                 <defs>
                   <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#006a6a" stopOpacity={0.3}/>
@@ -178,24 +224,22 @@ export const Dashboard = () => {
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="bg-surface-container-low rounded-2xl p-6 space-y-4">
+        <div className="premium-card premium-hover p-6 space-y-4">
           <div className="flex justify-between items-center mb-2">
             <h3 className="text-lg font-bold text-primary">Pilot Localities</h3>
             <span className="text-xs font-bold text-secondary uppercase tracking-tighter">Live Map</span>
           </div>
-          <div className="space-y-3">
+          <LiveRouteMap points={localityPoints} className="mb-4" />
+          <div className="grid grid-cols-2 gap-3">
             {[
               { name: 'HSR Layout', count: '1.2k members' },
               { name: 'Koramangala', count: '850 members' },
               { name: 'Indiranagar', count: '2.1k members' },
               { name: 'Whitefield', count: '3.4k members' },
             ].map((loc, i) => (
-              <div key={i} className="flex items-center justify-between p-3 bg-white rounded-xl shadow-sm border border-slate-100/50">
-                <span className="text-sm font-bold text-primary">{loc.name}</span>
-                <div className="flex items-center space-x-3">
-                  <span className="text-xs font-semibold text-slate-500">{loc.count}</span>
-                  <span className="w-2 h-2 rounded-full bg-secondary"></span>
-                </div>
+              <div key={i} className="p-3 rounded-xl bg-surface-container-low border border-outline-variant/20">
+                <p className="text-sm font-bold text-primary">{loc.name}</p>
+                <p className="text-xs font-semibold text-slate-500 mt-1">{loc.count}</p>
               </div>
             ))}
           </div>
@@ -205,7 +249,7 @@ export const Dashboard = () => {
           <h3 className="text-lg font-bold text-primary mb-6">Apartment Demand Split</h3>
           <div className="flex-1">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={demandData}>
+              <BarChart data={apartmentDemandData}>
                 <Bar dataKey="value" fill="#003366" radius={[4, 4, 0, 0]} />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700}} />
               </BarChart>
@@ -219,13 +263,13 @@ export const Dashboard = () => {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={productData}
+                  data={productDemandData}
                   innerRadius={60}
                   outerRadius={80}
                   paddingAngle={5}
                   dataKey="value"
                 >
-                  {productData.map((entry, index) => (
+                  {productDemandData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
                   ))}
                 </Pie>
@@ -234,7 +278,7 @@ export const Dashboard = () => {
             </ResponsiveContainer>
           </div>
           <div className="grid grid-cols-1 gap-2 mt-4">
-            {productData.map((item, i) => (
+            {productDemandData.map((item, i) => (
               <div key={i} className="flex items-center justify-between text-[11px] font-bold">
                 <div className="flex items-center">
                   <span className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: item.color }}></span> 
@@ -250,7 +294,7 @@ export const Dashboard = () => {
       <section className="bg-surface-container-lowest rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,30,64,0.06)] overflow-hidden">
         <div className="p-8 flex justify-between items-center bg-surface-container-low/50">
           <h3 className="text-xl font-bold text-primary">Live Reservations Feed</h3>
-          <button className="flex items-center space-x-2 text-xs font-bold text-white bg-primary px-4 py-2 rounded-lg">
+          <button onClick={exportLogs} className="flex items-center space-x-2 text-xs font-bold text-white bg-primary px-4 py-2 rounded-lg">
             <Download size={14} />
             <span>Export Logs</span>
           </button>
@@ -268,11 +312,21 @@ export const Dashboard = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {[
+              {(metrics?.live_reservations?.length ? metrics.live_reservations.map((row) => ({
+                name: row.customer_name,
+                initial: row.customer_name.split(' ').map((p) => p[0]).slice(0, 2).join(''),
+                apt: row.apartment_name,
+                loc: row.locality,
+                prod: row.product_name,
+                qty: `${row.quantity_kg}kg`,
+                amt: `₹${row.total_amount}`,
+                fresh: `${Math.round(row.freshness_score)}%`,
+                time: new Date(row.created_at).toLocaleString(),
+              })) : [
                 { name: 'Aditya V.', initial: 'AV', apt: 'Sobha Dream', loc: 'Whitefield', prod: 'Seer Fish', qty: '1kg • Fresh Cut', amt: '₹1,240', fresh: '94%', time: '4m ago' },
                 { name: 'Priya K.', initial: 'PK', apt: 'Prestige Shantiniketan', loc: 'Whitefield', prod: 'Pomfret', qty: '500g • Whole', amt: '₹860', fresh: '96%', time: '12m ago' },
                 { name: 'Rohan N.', initial: 'RN', apt: 'Mantri Alpyne', loc: 'Indiranagar', prod: 'Tiger Prawns', qty: '250g • Deveined', amt: '₹540', fresh: '92%', time: '22m ago' },
-              ].map((row, i) => (
+              ]).map((row, i) => (
                 <tr key={i} className="hover:bg-surface-container-low transition-colors group">
                   <td className="px-8 py-5">
                     <div className="flex items-center space-x-3">
@@ -299,9 +353,10 @@ export const Dashboard = () => {
           </table>
         </div>
         <div className="p-6 text-center border-t border-slate-50">
-          <button className="text-[10px] font-black text-primary uppercase tracking-widest hover:text-secondary transition-colors">View All Transactions</button>
+          <button onClick={() => onNavigate?.('proof')} className="text-[10px] font-black text-primary uppercase tracking-widest hover:text-secondary transition-colors">View All Transactions</button>
         </div>
       </section>
+      {status && <p className="text-sm font-semibold text-primary">{status}</p>}
     </div>
   );
 };

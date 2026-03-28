@@ -1,19 +1,27 @@
 from pydantic import BaseModel
-from typing import Optional
-from datetime import datetime
 
-class TrackingEventBase(BaseModel):
+
+class TrackingStage(BaseModel):
+    key: str
+    label: str
+    timestamp: str | None = None
+    completed: bool
+    current: bool = False
+
+
+class OrderTrackingResponse(BaseModel):
     order_id: str
-    event_type: str
-    location: str
-    temperature_celsius: Optional[float] = None
-
-class TrackingEventCreate(TrackingEventBase):
-    pass
-
-class TrackingEventResponse(TrackingEventBase):
-    id: str
-    timestamp: datetime
-
-    class Config:
-        from_attributes = True
+    status: str
+    customer_name: str
+    apartment_name: str
+    locality: str
+    product_name: str
+    quantity_kg: float
+    total_amount: float
+    freshness_score: float
+    freshness_label: str
+    source_boat: str
+    catch_zone: str
+    cold_chain_maintained: bool
+    eta: str
+    timeline: list[TrackingStage]

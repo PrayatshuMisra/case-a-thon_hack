@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { 
   Timer, 
   Verified, 
@@ -18,8 +18,80 @@ import {
   Anchor
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
+import { api, type LiveDropProduct } from '@/src/api/client';
 
-export const Home = () => {
+export const Home = ({
+  onNavigate,
+  onOrderReserved,
+}: {
+  onNavigate?: (tab: string) => void;
+  onOrderReserved?: (orderId: string) => void;
+}) => {
+  const [liveProducts, setLiveProducts] = useState<LiveDropProduct[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState('Seer Fish');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState('');
+  const [form, setForm] = useState({
+    customer_name: '',
+    phone: '',
+    apartment_name: '',
+    locality: 'Whitefield',
+    product_name: 'Seer Fish',
+    quantity_kg: 1,
+  });
+
+  useEffect(() => {
+    api.getLiveDrop().then((data) => {
+      setLiveProducts(data.products);
+      if (data.products.length > 0) {
+        setSelectedProduct(data.products[0].product_name);
+        setForm((prev) => ({ ...prev, product_name: data.products[0].product_name }));
+      }
+    }).catch(() => {
+      setMessage('Live drop service unavailable. You can still reserve manually.');
+    });
+  }, []);
+
+  const cards = useMemo(() => {
+    if (liveProducts.length > 0) {
+      return liveProducts.map((item) => ({
+        name: item.product_name,
+        sci: 'Premium Catch',
+        price: `₹${Math.round(item.current_price)}`,
+        old: `₹${Math.round(item.base_price)}`,
+        score: Math.round(item.freshness_score),
+        boat: item.source_boat,
+        img: item.product_name.toLowerCase().replace(/\s+/g, ''),
+      }));
+    }
+    return [
+      { name: 'Seer Fish', sci: 'Scomberomorus guttatus', price: '₹949', old: '₹1,200', score: 94, boat: 'MAL-74', img: 'seer' },
+      { name: 'Silver Pomfret', sci: 'Pampus argenteus', price: '₹1,199', old: '₹1,450', score: 96, boat: 'MAL-31', img: 'pomfret' },
+      { name: 'Tiger Prawns', sci: 'Penaeus monodon', price: '₹649', old: '₹850', score: 92, boat: 'MAL-88', img: 'prawns' },
+    ];
+  }, [liveProducts]);
+
+  const reserveProduct = (productName: string) => {
+    setSelectedProduct(productName);
+    setForm((prev) => ({ ...prev, product_name: productName }));
+    document.getElementById('reserve-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  const onSubmitReserve = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setMessage('');
+    setIsSubmitting(true);
+    try {
+      const result = await api.reserveOrder(form);
+      onOrderReserved?.(result.order_id);
+      setMessage(`Order reserved successfully. Tracking ID: ${result.order_id.slice(0, 8)}...`);
+      onNavigate?.('logistics');
+    } catch (error) {
+      setMessage('Reservation failed. Please verify details and retry.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   return (
     <div className="space-y-24 pb-24">
       {/* Hero Section */}
@@ -46,16 +118,36 @@ export const Home = () => {
               Premium, traceable seafood sourced directly from Malpe fishing families and delivered with <span className="font-semibold text-primary">freshness intelligence</span>.
             </p>
             <div className="flex flex-wrap gap-4 pt-4">
-              <button className="px-8 py-4 bg-primary text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl hover:translate-y-[-2px] transition-all">
+              <button onClick={() => reserveProduct(selectedProduct)} className="px-8 py-4 bg-primary text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl hover:translate-y-[-2px] transition-all">
                 Reserve Today's Catch
               </button>
-              <button className="px-8 py-4 bg-white text-primary rounded-xl font-bold text-lg shadow-sm border border-outline-variant/20 hover:bg-surface-container-low transition-all">
+              <button onClick={() => onNavigate?.('logistics')} className="px-8 py-4 bg-white text-primary rounded-xl font-bold text-lg shadow-sm border border-outline-variant/20 hover:bg-surface-container-low transition-all">
                 Track Active Fleet
               </button>
             </div>
           </div>
         </div>
       </header>
+
+      <section className="container mx-auto px-8 -mt-8 relative z-20">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="premium-card p-5 premium-hover">
+            <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">Live Drops</p>
+            <p className="text-3xl font-black text-primary mt-2">{liveProducts.length || 3}</p>
+            <p className="text-sm text-on-surface-variant mt-1">Active seafood varieties today</p>
+          </div>
+          <div className="premium-card p-5 premium-hover">
+            <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">Freshness Promise</p>
+            <p className="text-3xl font-black text-primary mt-2">&gt; 90</p>
+            <p className="text-sm text-on-surface-variant mt-1">AI-scored premium quality threshold</p>
+          </div>
+          <div className="premium-card p-5 premium-hover">
+            <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">Traceability</p>
+            <p className="text-3xl font-black text-primary mt-2">100%</p>
+            <p className="text-sm text-on-surface-variant mt-1">Boat-to-door provenance timeline</p>
+          </div>
+        </div>
+      </section>
 
       {/* Daily Catch Section */}
       <section className="container mx-auto px-8">
@@ -74,11 +166,7 @@ export const Home = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-          {[
-            { name: 'Seer Fish', sci: 'Scomberomorus guttatus', price: '₹949', old: '₹1,200', score: 94, boat: 'MAL-74', img: 'seer' },
-            { name: 'Silver Pomfret', sci: 'Pampus argenteus', price: '₹1,199', old: '₹1,450', score: 96, boat: 'MAL-31', img: 'pomfret' },
-            { name: 'Tiger Prawns', sci: 'Penaeus monodon', price: '₹649', old: '₹850', score: 92, boat: 'MAL-88', img: 'prawns' },
-          ].map((item, i) => (
+          {cards.map((item, i) => (
             <div key={i} className="group bg-white rounded-[2rem] overflow-hidden shadow-[0_10px_40px_-10px_rgba(0,30,64,0.06)] hover:translate-y-[-8px] transition-all duration-500">
               <div className="relative h-72 overflow-hidden">
                 <img 
@@ -118,7 +206,7 @@ export const Home = () => {
                   </div>
                   <span className="px-3 py-1 bg-secondary text-white text-[10px] font-bold rounded-full uppercase">Excellent</span>
                 </div>
-                <button className="w-full py-4 bg-primary text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary-container transition-colors">
+                <button onClick={() => reserveProduct(item.name)} className="w-full py-4 bg-primary text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary-container transition-colors">
                   Reserve Now
                   <ArrowRight size={18} />
                 </button>
@@ -169,31 +257,46 @@ export const Home = () => {
               <h2 className="text-4xl font-manrope font-extrabold text-primary mb-4 tracking-tight">Reserve Your Catch</h2>
               <p className="text-on-surface-variant">Enter your details to secure your priority morning drop. No payment required until fulfillment confirmation.</p>
             </div>
-            <form className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <form id="reserve-form" onSubmit={onSubmitReserve} className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-bold text-primary ml-1">Full Name</label>
-                <input className="w-full bg-surface-container-low border-none rounded-xl py-4 px-6" placeholder="John Doe" />
+                <input value={form.customer_name} onChange={(e) => setForm((p) => ({ ...p, customer_name: e.target.value }))} className="w-full bg-surface-container-low border-none rounded-xl py-4 px-6" placeholder="John Doe" required />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-bold text-primary ml-1">Phone Number</label>
-                <input className="w-full bg-surface-container-low border-none rounded-xl py-4 px-6" placeholder="+91 98XXX XXXXX" />
+                <input value={form.phone} onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))} className="w-full bg-surface-container-low border-none rounded-xl py-4 px-6" placeholder="+91 98XXX XXXXX" required />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-bold text-primary ml-1">Apartment Name</label>
-                <input className="w-full bg-surface-container-low border-none rounded-xl py-4 px-6" placeholder="Sobha Windsor" />
+                <input value={form.apartment_name} onChange={(e) => setForm((p) => ({ ...p, apartment_name: e.target.value }))} className="w-full bg-surface-container-low border-none rounded-xl py-4 px-6" placeholder="Sobha Windsor" required />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-bold text-primary ml-1">Locality</label>
-                <select className="w-full bg-surface-container-low border-none rounded-xl py-4 px-6">
+                <select value={form.locality} onChange={(e) => setForm((p) => ({ ...p, locality: e.target.value }))} className="w-full bg-surface-container-low border-none rounded-xl py-4 px-6">
                   <option>Whitefield</option>
                   <option>Indiranagar</option>
+                  <option>HSR Layout</option>
+                  <option>Koramangala</option>
                 </select>
               </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-primary ml-1">Product</label>
+                <select value={form.product_name} onChange={(e) => setForm((p) => ({ ...p, product_name: e.target.value }))} className="w-full bg-surface-container-low border-none rounded-xl py-4 px-6">
+                  {(liveProducts.length > 0 ? liveProducts : cards as any).map((item: any) => (
+                    <option key={item.name ?? item.product_name}>{item.name ?? item.product_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold text-primary ml-1">Quantity (kg)</label>
+                <input type="number" min={0.5} step={0.5} value={form.quantity_kg} onChange={(e) => setForm((p) => ({ ...p, quantity_kg: Number(e.target.value) || 1 }))} className="w-full bg-surface-container-low border-none rounded-xl py-4 px-6" />
+              </div>
               <div className="md:col-span-2 pt-8">
-                <button className="w-full py-5 bg-secondary text-white rounded-2xl font-black text-xl shadow-lg hover:bg-primary transition-all flex items-center justify-center gap-3">
+                <button type="submit" disabled={isSubmitting} className="w-full py-5 bg-secondary text-white rounded-2xl font-black text-xl shadow-lg hover:bg-primary transition-all flex items-center justify-center gap-3 disabled:opacity-60">
                   Reserve My Catch
                   <Anchor size={24} />
                 </button>
+                {message && <p className="mt-4 text-sm font-semibold text-primary">{message}</p>}
               </div>
             </form>
           </div>
