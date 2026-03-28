@@ -1,0 +1,46 @@
+{
+  "demand_conversion": {
+    "intercept": -1.2,
+    "weights": {
+      "community_size": 0.002,
+      "freshness_score": 0.045,
+      "discount_pct": 0.03,
+      "weekend": 0.18,
+      "price_penalty": -0.0015,
+      "logistics_eta_hours": -0.08,
+      "repeat_rate": 0.8
+    }
+  },
+  "loi_closure": {
+    "intercept": -1.0,
+    "weights": {
+      "sample_sent": 0.9,
+      "lab_report_shared": 0.7,
+      "meeting_count": 0.22,
+      "monthly_volume_kg": 0.0009,
+      "days_in_pipeline": 0.03,
+      "decision_maker_contacted": 0.65
+    }
+  },
+  "freshness_sla": {
+    "intercept": -0.4,
+    "weights": {
+      "cold_chain_ok": 1.0,
+      "freshness_score": 0.03,
+      "eta_hours": -0.09,
+      "distance_km": -0.001
+    }
+  },
+  "bandit": {
+    "arms": {
+      "hsr-seer-rwa-wa": {
+        "alpha": 15.0,
+        "beta": 107.0
+      }
+    }
+  },
+  "meta": {
+    "version": "v1",
+    "trained_on": "2026-03-28T18:41:02.890463+00:00"
+  }
+}

@@ -89,6 +89,25 @@ export type DashboardMetrics = {
   };
 };
 
+export type TomorrowRecommendation = {
+  generated_at: string;
+  budget_context_inr: number;
+  top_arms: Array<{
+    arm_id: string;
+    locality: string;
+    product_name: string;
+    channel: string;
+    offer: string;
+    expected_orders: number;
+    expected_gmv: number;
+    conversion_probability: number;
+    sla_confidence: number;
+    confidence_band: string;
+    risk_flags: string[];
+  }>;
+  rationale: string[];
+};
+
 export const api = {
   getLiveDrop: () => request<{ products: LiveDropProduct[]; trust_signals: string[] }>('/api/live-drop'),
 
@@ -140,4 +159,21 @@ export const api = {
   getLois: () => request<Array<any>>('/api/lois'),
 
   getTracking: (orderId: string) => request<any>(`/api/order-tracking/${orderId}`),
+
+  getTomorrowRecommendation: () => request<TomorrowRecommendation>('/api/recommendation/tomorrow'),
+
+  getModelTractionScore: () => request<any>('/api/model/traction-score'),
+
+  logExperiment: (payload: {
+    arm_id: string;
+    locality: string;
+    product_name: string;
+    channel: string;
+    offer: string;
+    impressions: number;
+    orders: number;
+    revenue: number;
+  }) => request<any>('/api/experiment/log', { method: 'POST', body: JSON.stringify(payload) }),
+
+  getExperimentLogs: () => request<any>('/api/experiment/logs'),
 };

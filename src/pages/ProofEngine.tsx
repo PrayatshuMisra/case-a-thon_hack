@@ -17,13 +17,25 @@ import { api, type DashboardMetrics } from '@/src/api/client';
 
 export const ProofEngine = () => {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [modelScore, setModelScore] = useState<any>(null);
 
   useEffect(() => {
     api.getDashboardMetrics().then(setMetrics).catch(() => {});
+    api.getModelTractionScore().then(setModelScore).catch(() => {});
   }, []);
 
   const proof = metrics?.investor_proof;
   const readiness = useMemo(() => {
+    if (modelScore?.components?.length) {
+      const map = new Map(modelScore.components.map((c: any) => [String(c.name).toLowerCase(), String(c.label).toUpperCase()]));
+      return [
+        map.get('demand') ?? 'STRONG',
+        map.get('trust/sla') ?? 'STRONG',
+        map.get('demand') ?? 'STRONG',
+        map.get('supply') ?? 'STRONG',
+        map.get('loi pipeline') ?? 'STRONG',
+      ];
+    }
     if (!proof) return ['STRONG', 'STRONG', 'STRONG', 'STRONG', 'STRONG'];
     return [
       proof.readiness.launch ?? 'STRONG',
@@ -32,7 +44,7 @@ export const ProofEngine = () => {
       proof.readiness.supply ?? 'STRONG',
       proof.readiness.proof ?? 'STRONG',
     ].map((r) => String(r).toUpperCase());
-  }, [proof]);
+  }, [proof, modelScore]);
 
   return (
     <div className="max-w-7xl mx-auto space-y-12">
@@ -52,13 +64,31 @@ export const ProofEngine = () => {
         <div className="bg-white p-4 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,30,64,0.06)] flex items-center gap-4">
           <div className="text-right">
             <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Evidence Strength</p>
-            <p className="text-2xl font-black text-secondary">{Math.round(metrics?.investor_readiness.overall_proof_score ?? 92)}<span className="text-sm font-medium text-on-surface-variant">/100</span></p>
+            <p className="text-2xl font-black text-secondary">{Math.round(modelScore?.traction_score ?? metrics?.investor_readiness.overall_proof_score ?? 92)}<span className="text-sm font-medium text-on-surface-variant">/100</span></p>
           </div>
           <div className="w-12 h-12 rounded-full border-4 border-secondary-container flex items-center justify-center relative">
             <ShieldCheck className="text-secondary" size={24} />
           </div>
         </div>
       </header>
+
+      {modelScore?.components?.length && (
+        <section className="premium-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-black text-primary">Model-attributed Traction Score</h3>
+            <span className="text-xs font-black uppercase tracking-widest text-secondary">Updated {new Date(modelScore.generated_at).toLocaleString()}</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {modelScore.components.map((c: any) => (
+              <div key={c.name} className="rounded-2xl border border-outline-variant/20 p-4 bg-white">
+                <p className="text-xs font-black uppercase tracking-widest text-slate-400">{c.name}</p>
+                <p className="text-3xl font-black text-primary mt-1">{Math.round(c.score)}</p>
+                <p className="text-xs font-bold text-secondary mt-1">{c.label}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="grid grid-cols-1 md:grid-cols-12 gap-6">
         <div className="md:col-span-7 premium-card p-8 premium-hover relative overflow-hidden group">

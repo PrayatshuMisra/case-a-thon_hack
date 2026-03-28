@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { 
   LayoutDashboard, 
   BarChart3, 
@@ -10,14 +10,17 @@ import {
   HelpCircle,
   Bell,
   Ship,
-  User
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
+import PillNav, { type PillNavItem } from './PillNav';
+import logo from '@/src/assets/launchos-logo.svg';
 
 interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
 }
+
+type Persona = 'consumer' | 'admin';
 
 export const Sidebar = ({ activeTab, setActiveTab }: SidebarProps) => {
   const menuItems = [
@@ -60,7 +63,7 @@ export const Sidebar = ({ activeTab, setActiveTab }: SidebarProps) => {
       </nav>
 
       <div className="pt-6 border-t border-slate-200">
-        <button onClick={() => setActiveTab('home')} className="w-full py-3 px-4 bg-primary text-white rounded-xl font-bold text-sm shadow-lg shadow-primary/20 hover:scale-[0.98] transition-transform flex items-center justify-center gap-2">
+        <button onClick={() => setActiveTab('dashboard')} className="w-full py-3 px-4 bg-primary text-white rounded-xl font-bold text-sm shadow-lg shadow-primary/20 hover:scale-[0.98] transition-transform flex items-center justify-center gap-2">
           <Plus size={16} />
           <span>New Seafood Drop</span>
         </button>
@@ -73,12 +76,44 @@ export const Sidebar = ({ activeTab, setActiveTab }: SidebarProps) => {
   );
 };
 
-export const TopNav = ({ activeTab, onNavigate }: { activeTab: string; onNavigate?: (tab: string) => void }) => {
+export const TopNav = ({
+  activeTab,
+  onNavigate,
+  persona,
+  onPersonaChange,
+}: {
+  activeTab: string;
+  onNavigate?: (tab: string) => void;
+  persona: Persona;
+  onPersonaChange?: (persona: Persona) => void;
+}) => {
   const goTo = (tab: string) => {
     onNavigate?.(tab);
   };
 
-  const isInvestorsActive = activeTab === 'proof' || activeTab === 'investors';
+  const navItems: PillNavItem[] =
+    persona === 'consumer'
+      ? [
+          { label: 'Studio', href: '/home', tabKey: 'home' },
+          { label: 'Logistics', href: '/logistics', tabKey: 'logistics' },
+        ]
+      : [
+          { label: 'Dashboard', href: '/dashboard', tabKey: 'dashboard' },
+          { label: 'Fishers', href: '/fisher', tabKey: 'fisher' },
+          { label: 'LOI', href: '/loi', tabKey: 'loi' },
+          { label: 'Investors', href: '/investors', tabKey: 'investors' },
+        ];
+
+  const currentHref =
+    activeTab === 'home'
+      ? '/home'
+      : activeTab === 'logistics'
+      ? '/logistics'
+      : activeTab === 'dashboard'
+      ? '/dashboard'
+      : activeTab === 'proof' || activeTab === 'investors'
+      ? '/investors'
+      : '/home';
 
   return (
     <nav className="bg-white/80 backdrop-blur-xl sticky top-0 z-50 shadow-[0_10px_40px_-10px_rgba(0,30,64,0.06)] border-b border-outline-variant/10">
@@ -86,14 +121,45 @@ export const TopNav = ({ activeTab, onNavigate }: { activeTab: string; onNavigat
         <div className="text-2xl font-black tracking-tighter text-primary uppercase font-manrope">
           Malpe Meen
         </div>
-        <div className="hidden md:flex items-center space-x-8 font-manrope tracking-tight font-bold">
-          <button onClick={() => goTo('home')} className={cn("transition-colors", activeTab === 'home' ? "text-primary border-b-2 border-primary pb-1" : "text-slate-500 hover:text-primary")}>Studio</button>
-          <button onClick={() => goTo('logistics')} className={cn("transition-colors", activeTab === 'logistics' ? "text-primary border-b-2 border-primary pb-1" : "text-slate-500 hover:text-primary")}>Logistics</button>
-          <button onClick={() => goTo('dashboard')} className={cn("transition-colors", activeTab === 'dashboard' ? "text-primary border-b-2 border-primary pb-1" : "text-slate-500 hover:text-primary")}>Pilots</button>
-          <button onClick={() => goTo('investors')} className={cn("transition-colors", isInvestorsActive ? "text-primary border-b-2 border-primary pb-1" : "text-slate-500 hover:text-primary")}>Investors</button>
+        <div className="hidden md:block">
+          <PillNav
+            logo={logo}
+            logoAlt="LaunchOS Logo"
+            items={navItems}
+            activeHref={currentHref}
+            className="custom-nav"
+            ease="power2.easeOut"
+            baseColor="#001E40"
+            pillColor="#ffffff"
+            hoveredPillTextColor="#ffffff"
+            pillTextColor="#001E40"
+            theme="light"
+            initialLoadAnimation={false}
+            onItemClick={(item) => goTo(item.tabKey ?? 'home')}
+          />
         </div>
         <div className="flex items-center space-x-4">
-          <button onClick={() => goTo('dashboard')} className="p-2 hover:bg-slate-100 rounded-lg transition-all">
+          <div className="hidden lg:flex items-center rounded-full bg-slate-100 p-1 gap-1">
+            <button
+              onClick={() => onPersonaChange?.('consumer')}
+              className={cn(
+                'px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors',
+                persona === 'consumer' ? 'bg-white text-primary shadow-sm' : 'text-slate-500'
+              )}
+            >
+              Buyer
+            </button>
+            <button
+              onClick={() => onPersonaChange?.('admin')}
+              className={cn(
+                'px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors',
+                persona === 'admin' ? 'bg-white text-primary shadow-sm' : 'text-slate-500'
+              )}
+            >
+              Admin
+            </button>
+          </div>
+          <button onClick={() => goTo(persona === 'admin' ? 'dashboard' : 'home')} className="p-2 hover:bg-slate-100 rounded-lg transition-all">
             <Bell size={20} className="text-primary" />
           </button>
           <button onClick={() => goTo('logistics')} className="p-2 hover:bg-slate-100 rounded-lg transition-all">

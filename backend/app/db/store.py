@@ -68,6 +68,7 @@ class DataStore:
     fishers: list[dict[str, Any]] = field(default_factory=list)
     lois: list[dict[str, Any]] = field(default_factory=list)
     shipments: list[dict[str, Any]] = field(default_factory=_seed_shipments)
+    experiments: list[dict[str, Any]] = field(default_factory=list)
 
     def add_order(self, payload: dict[str, Any]) -> dict[str, Any]:
         self.orders.insert(0, payload)
@@ -79,6 +80,10 @@ class DataStore:
 
     def add_loi(self, payload: dict[str, Any]) -> dict[str, Any]:
         self.lois.insert(0, payload)
+        return payload
+
+    def add_experiment(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.experiments.insert(0, payload)
         return payload
 
     def get_order(self, order_id: str) -> dict[str, Any] | None:
