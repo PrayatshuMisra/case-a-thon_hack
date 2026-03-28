@@ -1,4 +1,8 @@
-const API_BASE = ((import.meta as any).env?.VITE_API_URL as string | undefined) ?? 'http://localhost:8000';
+// When VITE_API_URL is not set, use empty string so /api/* paths go through
+// the Vite dev-server proxy (configured in vite.config.ts) which forwards
+// them to the FastAPI backend on localhost:8000.
+// In production, set VITE_API_URL to the deployed backend URL.
+const API_BASE = ((import.meta as any).env?.VITE_API_URL as string | undefined) ?? '';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -97,6 +101,36 @@ export type MlScenarioPrediction = {
   recommended_action: string;
 };
 
+export type TomorrowRecommendationArm = {
+  arm_id: string;
+  locality: string;
+  product_name: string;
+  channel: string;
+  offer: string;
+  expected_orders: number;
+  expected_gmv: number;
+  conversion_probability: number;
+  sla_confidence: number;
+  confidence_band: string;
+  risk_flags: string[];
+};
+
+export type TomorrowRecommendation = {
+  generated_at: string;
+  budget_context_inr: number;
+  top_arms: TomorrowRecommendationArm[];
+  rationale: string[];
+};
+
+export type ExperimentLogResponse = {
+  status: string;
+  arm_id: string;
+  updated_alpha: number;
+  updated_beta: number;
+  empirical_conversion_rate: number;
+  next_best_arm_id: string;
+};
+
 export const api = {
   getLiveDrop: () => request<{ products: LiveDropProduct[]; trust_signals: string[] }>('/api/live-drop'),
 
@@ -148,6 +182,22 @@ export const api = {
   getLois: () => request<Array<any>>('/api/lois'),
 
   getTracking: (orderId: string) => request<any>(`/api/order-tracking/${orderId}`),
+
+  getTomorrowRecommendation: () => request<TomorrowRecommendation>('/api/recommendation/tomorrow'),
+
+  logExperiment: (payload: {
+    arm_id: string;
+    locality: string;
+    product_name: string;
+    channel: string;
+    offer: string;
+    impressions: number;
+    orders: number;
+    revenue: number;
+  }) => request<ExperimentLogResponse>('/api/experiment/log', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
 
   predictMlScenario: (payload: {
     species: string;

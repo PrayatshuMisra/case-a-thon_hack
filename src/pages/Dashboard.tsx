@@ -27,7 +27,7 @@ import {
   Cell
 } from 'recharts';
 import { cn } from '@/src/lib/utils';
-import { api, type DashboardMetrics, type MlScenarioPrediction } from '@/src/api/client';
+import { api, type DashboardMetrics, type MlScenarioPrediction, type TomorrowRecommendation } from '@/src/api/client';
 import { LiveRouteMap, type RoutePoint } from '@/src/components/LiveRouteMap';
 import { generatePilotGroqInsight } from '@/src/lib/groq';
 import {
@@ -69,6 +69,7 @@ const formatNullableCurrency = (value: number | null | undefined): string => (va
 
 export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }) => {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
+  const [recommendation, setRecommendation] = useState<TomorrowRecommendation | null>(null);
   const [status, setStatus] = useState('');
   const [range, setRange] = useState<'7D' | '30D'>('7D');
   const [selectedStockId, setSelectedStockId] = useState('stock-seer');
@@ -83,7 +84,34 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
 
   useEffect(() => {
     api.getDashboardMetrics().then(setMetrics).catch(() => setStatus('Live metrics unavailable. Showing fallback values.'));
+    api.getTomorrowRecommendation().then(setRecommendation).catch(() => setStatus('ML recommendations unavailable.'));
   }, []);
+
+  const logTopArmExperiment = async () => {
+    const top = recommendation?.top_arms?.[0];
+    if (!top) {
+      setStatus('No recommendation arm available to log.');
+      return;
+    }
+    try {
+      const impressions = 100;
+      const orders = Math.max(1, Math.round(top.conversion_probability * impressions));
+      const revenue = Number((orders * (top.expected_gmv / Math.max(top.expected_orders, 1))).toFixed(2));
+      const result = await api.logExperiment({
+        arm_id: top.arm_id,
+        locality: top.locality,
+        product_name: top.product_name,
+        channel: top.channel,
+        offer: top.offer,
+        impressions,
+        orders,
+        revenue,
+      });
+      setStatus(`Experiment logged. Next best arm: ${result.next_best_arm_id}`);
+    } catch {
+      setStatus('Failed to log experiment.');
+    }
+  };
 
   const kpis = useMemo(() => {
     if (!metrics) {
@@ -555,6 +583,38 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
           />
         </div>
       </header>
+
+      <section className="premium-card p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-widest text-slate-400">ML Decision Engine</p>
+            <h3 className="text-xl font-black text-primary mt-1">Tomorrow Recommendation</h3>
+            <p className="text-sm text-on-surface-variant mt-1">Highest expected GMV arm under current freshness/SLA constraints.</p>
+          </div>
+          <button onClick={logTopArmExperiment} className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-black uppercase tracking-widest">
+            Log Pilot Experiment
+          </button>
+        </div>
+
+        {recommendation?.top_arms?.length ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
+            {recommendation.top_arms.map((arm) => (
+              <div key={arm.arm_id} className="rounded-2xl border border-outline-variant/30 bg-white p-4">
+                <p className="text-xs font-black text-secondary uppercase tracking-widest">{arm.confidence_band} Confidence</p>
+                <h4 className="text-lg font-black text-primary mt-1">{arm.locality} • {arm.product_name}</h4>
+                <p className="text-xs text-slate-500 mt-1">{arm.channel} • {arm.offer}</p>
+                <div className="mt-3 space-y-1 text-sm font-semibold text-primary">
+                  <p>Expected Orders: {arm.expected_orders}</p>
+                  <p>Expected GMV: ₹{arm.expected_gmv}</p>
+                  <p>SLA Confidence: {Math.round(arm.sla_confidence * 100)}%</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500 mt-4">No recommendation data available yet.</p>
+        )}
+      </section>
 
       <section className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
         {kpis.map((kpi, i) => (

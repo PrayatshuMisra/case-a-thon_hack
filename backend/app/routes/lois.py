@@ -3,6 +3,7 @@ from uuid import uuid4
 from fastapi import APIRouter
 
 from app.db.store import now_utc, store
+from app.db.supabase_client import get_supabase_client
 from app.schemas.loi import GenerateLoiRequest, GenerateLoiResponse
 
 router = APIRouter()
@@ -19,6 +20,14 @@ def _export_clauses() -> list[str]:
 
 @router.get("/api/lois")
 def get_lois():
+    """Always reads from Supabase so LOIs persist across backend restarts."""
+    try:
+        client = get_supabase_client()
+        resp = client.table("lois").select("*").execute()
+        if resp.data:
+            return resp.data
+    except Exception:
+        pass
     return store.lois
 
 

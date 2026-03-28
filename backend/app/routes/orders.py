@@ -4,6 +4,7 @@ from uuid import uuid4
 from fastapi import APIRouter, HTTPException
 
 from app.db.store import PRODUCT_CATALOG, now_utc, store
+from app.db.supabase_client import get_supabase_client
 from app.schemas.order import ReserveOrderRequest, ReserveOrderResponse
 from app.services.freshness_engine import calculate_freshness_intelligence
 from app.services.pricing_engine import calculate_dynamic_price
@@ -68,4 +69,12 @@ def reserve_order(payload: ReserveOrderRequest):
 
 @router.get("/api/orders")
 def get_orders():
+    """Always reads from Supabase so orders persist across backend restarts."""
+    try:
+        client = get_supabase_client()
+        resp = client.table("orders").select("*").execute()
+        if resp.data:
+            return resp.data
+    except Exception:
+        pass
     return store.orders

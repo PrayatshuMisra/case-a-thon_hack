@@ -5,9 +5,44 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import uuid4
 
+from app.db.supabase_client import get_supabase_client
+
+
+LAST_SUPABASE_WRITE_ERROR: str | None = None
+
+
+def get_last_supabase_write_error() -> str | None:
+    return LAST_SUPABASE_WRITE_ERROR
+
 
 def now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _serialize_for_db(value: Any) -> Any:
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {k: _serialize_for_db(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_serialize_for_db(v) for v in value]
+    return value
+
+
+def _upsert_supabase(table: str, payload: dict[str, Any]) -> None:
+    global LAST_SUPABASE_WRITE_ERROR
+    try:
+        client = get_supabase_client()
+        serialized = _serialize_for_db(payload)
+        if isinstance(serialized, dict) and serialized.get("id"):
+            client.table(table).upsert(serialized, on_conflict="id")
+        else:
+            client.table(table).insert(serialized)
+        LAST_SUPABASE_WRITE_ERROR = None
+    except Exception as exc:
+        LAST_SUPABASE_WRITE_ERROR = f"{table}: {exc}"
+        # Keep the app functional even if Supabase is unavailable or schema differs.
+        return
 
 
 def _seed_shipments() -> list[dict[str, Any]]:
@@ -68,17 +103,26 @@ class DataStore:
     fishers: list[dict[str, Any]] = field(default_factory=list)
     lois: list[dict[str, Any]] = field(default_factory=list)
     shipments: list[dict[str, Any]] = field(default_factory=_seed_shipments)
+    experiments: list[dict[str, Any]] = field(default_factory=list)
 
     def add_order(self, payload: dict[str, Any]) -> dict[str, Any]:
         self.orders.insert(0, payload)
+        _upsert_supabase("orders", payload)
         return payload
 
     def add_fisher(self, payload: dict[str, Any]) -> dict[str, Any]:
         self.fishers.insert(0, payload)
+        _upsert_supabase("fishers", payload)
         return payload
 
     def add_loi(self, payload: dict[str, Any]) -> dict[str, Any]:
         self.lois.insert(0, payload)
+        _upsert_supabase("lois", payload)
+        return payload
+
+    def add_experiment(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.experiments.insert(0, payload)
+        _upsert_supabase("experiments", payload)
         return payload
 
     def get_order(self, order_id: str) -> dict[str, Any] | None:

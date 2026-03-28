@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Sidebar, TopNav } from './components/Navigation';
 import { Home } from './pages/Home';
 import { Dashboard } from './pages/Dashboard';
@@ -12,11 +12,95 @@ import { ProofEngine } from './pages/ProofEngine';
 import { FisherStudio } from './pages/FisherStudio';
 import { motion, AnimatePresence } from 'motion/react';
 
+type Persona = 'consumer' | 'admin';
+
+const TAB_TO_PATH: Record<string, string> = {
+  home: '/home',
+  logistics: '/logistics',
+  dashboard: '/dashboard',
+  demand: '/demand',
+  fisher: '/fisher',
+  loi: '/loi',
+  proof: '/investors',
+  investors: '/investors',
+  settings: '/settings',
+};
+
+const PATH_TO_TAB: Record<string, string> = {
+  '/': 'home',
+  '/home': 'home',
+  '/logistics': 'logistics',
+  '/dashboard': 'dashboard',
+  '/demand': 'demand',
+  '/fisher': 'fisher',
+  '/loi': 'loi',
+  '/investors': 'investors',
+  '/settings': 'settings',
+};
+
+const TABS_BY_PERSONA: Record<Persona, string[]> = {
+  consumer: ['home', 'logistics'],
+  admin: ['dashboard', 'demand', 'fisher', 'loi', 'proof', 'investors', 'settings', 'logistics'],
+};
+
 const App = () => {
-  const [activeTab, setActiveTab] = useState('home');
+  const [persona, setPersona] = useState<Persona>(() => (localStorage.getItem('persona') as Persona) || 'consumer');
+  const [activeTab, setActiveTab] = useState(() => {
+    const tabFromPath = PATH_TO_TAB[window.location.pathname];
+    if (tabFromPath) return tabFromPath;
+    const savedPersona = (localStorage.getItem('persona') as Persona) || 'consumer';
+    return savedPersona === 'admin' ? 'dashboard' : 'home';
+  });
   const [latestOrderId, setLatestOrderId] = useState<string | null>(() => localStorage.getItem('latest_order_id'));
 
-  const navigate = (tab: string) => setActiveTab(tab);
+  const applyHistory = (tab: string, mode: 'push' | 'replace' = 'push') => {
+    const path = TAB_TO_PATH[tab] ?? '/home';
+    if (window.location.pathname === path) return;
+    if (mode === 'replace') {
+      window.history.replaceState({ tab }, '', path);
+    } else {
+      window.history.pushState({ tab }, '', path);
+    }
+  };
+
+  useEffect(() => {
+    if (!TABS_BY_PERSONA[persona].includes(activeTab)) {
+      const fallback = persona === 'admin' ? 'dashboard' : 'home';
+      setActiveTab(fallback);
+      applyHistory(fallback, 'replace');
+    }
+  }, [persona, activeTab]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      const fromPath = PATH_TO_TAB[window.location.pathname] ?? 'home';
+      if (TABS_BY_PERSONA[persona].includes(fromPath)) {
+        setActiveTab(fromPath);
+      } else {
+        const fallback = persona === 'admin' ? 'dashboard' : 'home';
+        setActiveTab(fallback);
+        applyHistory(fallback, 'replace');
+      }
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [persona]);
+
+  const navigate = (tab: string) => {
+    if (TABS_BY_PERSONA[persona].includes(tab)) {
+      setActiveTab(tab);
+      applyHistory(tab, 'push');
+    }
+  };
+
+  const switchPersona = (nextPersona: Persona) => {
+    setPersona(nextPersona);
+    localStorage.setItem('persona', nextPersona);
+    const nextTab = nextPersona === 'consumer' ? 'home' : 'dashboard';
+    setActiveTab(nextTab);
+    applyHistory(nextTab, 'replace');
+  };
 
   const handleOrderReserved = (orderId: string) => {
     setLatestOrderId(orderId);
@@ -24,25 +108,39 @@ const App = () => {
   };
 
   const renderContent = () => {
+    if (!TABS_BY_PERSONA[persona].includes(activeTab)) {
+      return (
+        <div className="premium-card p-8 max-w-2xl mx-auto text-center">
+          <h3 className="text-2xl font-black text-primary">Access Restricted</h3>
+          <p className="text-on-surface-variant mt-3">This screen is hidden for your current persona.</p>
+          <button onClick={() => switchPersona(persona === 'consumer' ? 'admin' : 'consumer')} className="mt-6 px-5 py-2 rounded-xl bg-primary text-white font-bold">
+            Switch to {persona === 'consumer' ? 'Admin' : 'Buyer'}
+          </button>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case 'home':
         return <Home onNavigate={navigate} onOrderReserved={handleOrderReserved} />;
       case 'dashboard':
+      case 'demand':
         return <Dashboard onNavigate={navigate} />;
       case 'logistics':
         return <Logistics onNavigate={navigate} orderId={latestOrderId} />;
       case 'proof':
       case 'investors':
+      case 'settings':
         return <ProofEngine />;
       case 'fisher':
       case 'loi':
         return <FisherStudio />;
       default:
-        return <Home />;
+        return persona === 'consumer' ? <Home onNavigate={navigate} onOrderReserved={handleOrderReserved} /> : <Dashboard onNavigate={navigate} />;
     }
   };
 
-  const isAdminPage = ['dashboard', 'demand', 'fisher', 'loi', 'proof', 'investors', 'settings'].includes(activeTab);
+  const isAdminPage = persona === 'admin';
 
   return (
     <div className="min-h-screen bg-surface selection:bg-secondary/20 selection:text-secondary relative overflow-hidden">
@@ -51,9 +149,9 @@ const App = () => {
 
       {isAdminPage ? (
         <div className="flex">
-          <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+          <Sidebar activeTab={activeTab} setActiveTab={navigate} />
           <main className="flex-1 ml-64 min-h-screen">
-            <TopNav activeTab={activeTab} onNavigate={navigate} />
+            <TopNav activeTab={activeTab} onNavigate={navigate} persona={persona} onPersonaChange={switchPersona} />
             <div className="p-8 lg:p-12 max-w-screen-2xl mx-auto">
               <AnimatePresence mode="wait">
                 <motion.div
@@ -71,7 +169,7 @@ const App = () => {
         </div>
       ) : (
         <div className="flex flex-col">
-          <TopNav activeTab={activeTab} onNavigate={navigate} />
+          <TopNav activeTab={activeTab} onNavigate={navigate} persona={persona} onPersonaChange={switchPersona} />
           <div className="flex-1">
             <AnimatePresence mode="wait">
               <motion.div
@@ -81,15 +179,6 @@ const App = () => {
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.5 }}
               >
-                {activeTab === 'home' && (
-                  <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-primary/90 backdrop-blur-xl px-6 py-3 rounded-full shadow-2xl border border-white/10 flex items-center gap-6">
-                    <button onClick={() => setActiveTab('home')} className={`text-xs font-bold uppercase tracking-widest ${activeTab === 'home' ? 'text-secondary-container' : 'text-white/60'}`}>Home</button>
-                    <div className="w-px h-4 bg-white/10"></div>
-                    <button onClick={() => setActiveTab('logistics')} className={`text-xs font-bold uppercase tracking-widest ${activeTab === 'logistics' ? 'text-secondary-container' : 'text-white/60'}`}>Logistics</button>
-                    <div className="w-px h-4 bg-white/10"></div>
-                    <button onClick={() => setActiveTab('dashboard')} className="text-xs font-bold uppercase tracking-widest text-white/60 hover:text-white transition-colors">Admin OS</button>
-                  </div>
-                )}
                 {latestOrderId && (
                   <div className="fixed top-24 right-6 z-40 premium-card px-4 py-2 text-xs font-bold text-primary hidden md:block">
                     Active tracking: {latestOrderId.slice(0, 8)}...

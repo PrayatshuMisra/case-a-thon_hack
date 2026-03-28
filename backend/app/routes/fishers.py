@@ -3,6 +3,7 @@ from uuid import uuid4
 from fastapi import APIRouter
 
 from app.db.store import now_utc, store
+from app.db.supabase_client import get_supabase_client
 from app.schemas.fisher import AddFisherRequest, AddFisherResponse
 
 router = APIRouter()
@@ -16,6 +17,18 @@ def _income_uplift_percent(avg_weekly_catch_kg: float) -> float:
 
 @router.get("/api/fishers")
 def get_fishers():
+    """
+    Always reads from Supabase so data persists across backend restarts.
+    Falls back to the in-memory store if Supabase is unavailable.
+    """
+    try:
+        client = get_supabase_client()
+        resp = client.table("fishers").select("*").execute()
+        if resp.data:
+            return resp.data
+    except Exception:
+        pass
+    # Fallback: return in-memory list (empty after restart unless seeded)
     return store.fishers
 
 
@@ -30,6 +43,7 @@ def onboard_fisher(payload: AddFisherRequest):
         "species_focus": payload.species_focus,
         "avg_weekly_catch_kg": payload.avg_weekly_catch_kg,
         "commitment_level": payload.commitment_level,
+        "mobile_number": payload.mobile_number,
         "income_uplift_pct": uplift,
         "status": "Onboarded",
         "created_at": now_utc(),
