@@ -49,6 +49,25 @@ export const Home = ({
     quantity_kg: 1,
   });
 
+  // Countdown timer state (initialized to 02:45:12, which is 9912 seconds)
+  const [timeLeft, setTimeLeft] = useState(9912);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTime = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hrs.toString().padStart(2, "0")}:${mins
+      .toString()
+      .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
   useEffect(() => {
     api
       .getLiveDrop()
@@ -131,9 +150,27 @@ export const Home = ({
     try {
       const result = await api.reserveOrder(form);
       onOrderReserved?.(result.order_id);
+      
+      // Dispatch confirmation SMS
+      try {
+        await api.sendSms({
+          phone: form.phone,
+          message: `Your Malpe Meen order for ${form.product_name} is confirmed! Tracking ID: ${result.order_id.slice(0, 8)}`
+        });
+      } catch (err) {
+        console.error("Failed to send order confirmation SMS", err);
+      }
+
       setMessage(
         `🎉 Order reserved successfully! Tracking ID: ${result.order_id.slice(0, 8)}`,
       );
+      
+      // Fire and forget SMS
+      api.sendSms({
+        phone: form.phone,
+        message: `Hi ${form.customer_name}, your catch of ${form.quantity_kg}kg ${form.product_name} is secured! Tracking ID: ${result.order_id.slice(0, 8)}. We will update you on the shipment.`
+      }).catch(console.error);
+
       setTimeout(() => onNavigate?.("logistics"), 1500);
     } catch (error) {
       setMessage("Reservation failed. Please verify details and retry.");
@@ -257,118 +294,171 @@ export const Home = ({
         </section>
 
         {/* Daily Catch Section */}
-        <section className="container mx-auto px-6">
-          <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-6">
-            <div className="max-w-2xl">
-              <h2 className="text-4xl md:text-5xl font-manrope font-extrabold text-primary mb-4 tracking-tight">
-                Today's Flash Drop
+        <section className="container mx-auto px-6 overflow-hidden">
+          <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-8">
+            <div className="max-w-2xl relative">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-red-50 text-red-600 rounded-full border border-red-100 shadow-sm">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-600"></span>
+                  </span>
+                  <span className="text-[10px] font-black uppercase tracking-widest">Live Drops</span>
+                </div>
+                <div className="h-px w-12 bg-slate-200"></div>
+                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">Malpe Harbor Hub</span>
+              </div>
+              <h2 className="text-5xl md:text-6xl font-manrope font-extrabold text-primary mb-6 tracking-tight leading-none">
+                Today's <span className="text-transparent bg-clip-text bg-gradient-to-r from-secondary to-blue-600">Flash Drop</span>
               </h2>
-              <p className="text-slate-500 text-lg">
-                Real-time availability from the morning landings. Limited
-                quantities prioritized for subscriber apartments.
+              <p className="text-slate-600 text-lg font-medium leading-relaxed">
+                Real-time availability from the morning landings. Limited quantities prioritized for subscriber apartments with <span className="text-primary font-bold decoration-secondary/30 decoration-4 underline-offset-4 underline">AI-verified freshness</span>.
               </p>
             </div>
-            <div className="bg-red-50 border border-red-100 px-6 py-4 rounded-2xl flex items-center gap-4 shadow-sm">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
-                <Timer className="text-red-500 animate-pulse" size={20} />
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase text-red-500 tracking-wider">
-                  Window Closing In
-                </p>
-                <p className="text-2xl font-black text-red-600 font-mono tracking-tight">
-                  02:45:12
-                </p>
+            
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-red-500 to-orange-500 rounded-2xl blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
+              <div className="relative bg-white border border-red-100 px-8 py-5 rounded-2xl flex items-center gap-4 shadow-xl">
+                <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center text-red-500">
+                  <Timer className="animate-pulse" size={24} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase text-red-400 tracking-[0.2em] mb-1">
+                    Booking Window
+                  </p>
+                  <p className="text-3xl font-black text-red-600 font-mono tracking-tighter tabular-nums drop-shadow-sm">
+                    {formatTime(timeLeft)}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Live Fleet Marquee */}
+          <div className="relative mb-16 py-4 border-y border-slate-100 bg-slate-50/50 backdrop-blur-sm overflow-hidden group">
+            <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-white to-transparent z-10"></div>
+            <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-white to-transparent z-10"></div>
+            
+            <div className="flex animate-marquee whitespace-nowrap gap-12 items-center">
+              {[...Array(2)].map((_, idx) => (
+                <div key={idx} className="flex gap-12 items-center">
+                  <div className="flex items-center gap-2 text-primary/60 font-bold text-sm">
+                    <Ship size={16} className="text-secondary" />
+                    <span>BOAT MAL-74 JUST LANDED 450KG SEER FISH</span>
+                  </div>
+                  <div className="w-1.5 h-1.5 bg-slate-300 rounded-full"></div>
+                  <div className="flex items-center gap-2 text-primary/60 font-bold text-sm">
+                    <Truck size={16} className="text-secondary" />
+                    <span>TEMP CONTROLLED TRUCK DEPARTING FOR WHITEFIELD</span>
+                  </div>
+                  <div className="w-1.5 h-1.5 bg-slate-300 rounded-full"></div>
+                  <div className="flex items-center gap-2 text-emerald-600 font-bold text-sm">
+                    <Verified size={16} />
+                    <span>NEW GRADE A+ POMFRET DROP JUST IDENTIFIED</span>
+                  </div>
+                  <div className="w-1.5 h-1.5 bg-slate-300 rounded-full"></div>
+                  <div className="flex items-center gap-2 text-primary/60 font-bold text-sm">
+                    <Anchor size={16} className="text-secondary" />
+                    <span>BOAT MAL-31 DOCKING IN 15 MINS</span>
+                  </div>
+                  <div className="w-1.5 h-1.5 bg-slate-300 rounded-full"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
             {cards.map((item, i) => (
               <div
                 key={i}
-                className="group bg-white border border-slate-100 rounded-[2.5rem] overflow-hidden shadow-xl hover:shadow-2xl hover:ring-2 hover:ring-secondary/50 transition-all duration-500 flex flex-col"
+                className="group relative bg-white border border-slate-100 rounded-[3rem] overflow-hidden shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] hover:shadow-[0_40px_80px_-20px_rgba(0,0,0,0.12)] transition-all duration-500 flex flex-col premium-hover"
               >
-                <div className="relative h-64 overflow-hidden">
+                <div className="relative h-72 overflow-hidden shimmer-effect">
                   <img
-                    src={`https://picsum.photos/seed/${item.img}/600/400`}
+                    src={`https://picsum.photos/seed/${item.img}/800/600`}
                     alt={item.name}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ease-out"
                     referrerPolicy="no-referrer"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-transparent to-transparent opacity-80"></div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-primary/20 to-transparent"></div>
 
-                  <div className="absolute top-4 left-4 flex flex-col gap-2">
-                    <span className="bg-white/90 backdrop-blur-sm text-primary px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm">
+                  <div className="absolute top-6 left-6 flex flex-col gap-3">
+                    <div className="flex items-center gap-2 bg-white/95 backdrop-blur-md text-primary px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl animate-flash border border-white">
+                      <span className="flex h-2 w-2 rounded-full bg-red-500"></span>
                       Flash Drop
-                    </span>
+                    </div>
                     {item.stock < 5 && (
-                      <span className="bg-red-500 text-white px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-1 shadow-sm">
-                        <TrendingUp size={12} />
+                      <div className="bg-red-500/90 backdrop-blur-md text-white px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 shadow-xl animate-flash">
+                        <TrendingUp size={14} />
                         Only {item.stock} left
-                      </span>
+                      </div>
                     )}
                   </div>
 
-                  <div className="absolute bottom-4 left-4 right-4 flex justify-between items-center text-white">
-                    <div className="flex items-center gap-2 bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
-                      <Ship size={14} className="text-secondary" />
-                      <span className="text-xs font-medium">
-                        Boat: {item.boat}
+                  <div className="absolute bottom-6 left-6 right-6 flex justify-between items-center text-white">
+                    <div className="flex items-center gap-2.5 bg-white/20 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/30 shadow-lg group-hover:bg-white/30 transition-colors">
+                      <Ship size={16} className="text-secondary" />
+                      <span className="text-xs font-black tracking-wider uppercase">
+                        Vessel: {item.boat}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-8 flex flex-col flex-grow">
-                  <div className="flex justify-between items-start mb-6">
+                <div className="p-10 flex flex-col flex-grow relative">
+                  <div className="flex justify-between items-start mb-8">
                     <div>
-                      <h3 className="text-2xl font-manrope font-bold text-primary mb-1">
+                      <h3 className="text-3xl font-manrope font-black text-primary mb-1 tracking-tight">
                         {item.name}
                       </h3>
-                      <p className="text-slate-500 text-sm italic">
+                      <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">
                         {item.sci}
                       </p>
                     </div>
                     <div className="text-right">
-                      <span className="text-sm line-through text-slate-400 font-medium">
+                      <span className="text-sm line-through text-slate-300 font-bold decoration-red-500/20">
                         {item.old}
                       </span>
-                      <p className="text-2xl font-black text-primary">
-                        {item.price}
-                        <span className="text-sm font-normal text-slate-500">
+                      <div className="flex items-baseline gap-1">
+                        <p className="text-3xl font-black text-primary tracking-tighter">
+                          {item.price}
+                        </p>
+                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
                           /kg
                         </span>
-                      </p>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl mb-8">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                        <Award size={20} className="text-green-600" />
+                  <div className="flex items-center justify-between p-5 bg-slate-50/50 border border-slate-100 rounded-3xl mb-10 group-hover:bg-primary/5 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center border border-slate-100">
+                        <Award size={24} className="text-emerald-500" />
                       </div>
                       <div>
-                        <p className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">
-                          AI Freshness
+                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-0.5">
+                          Fresh Score
                         </p>
-                        <p className="text-lg font-black text-primary leading-none">
-                          {item.score}/100
+                        <p className="text-xl font-black text-primary leading-none tracking-tight">
+                          {item.score}<span className="text-slate-300 text-sm">/100</span>
                         </p>
                       </div>
                     </div>
-                    <span className="px-3 py-1 bg-green-500/10 text-green-600 border border-green-500/20 text-[10px] font-bold rounded-full uppercase tracking-wider">
-                      Grade A+
-                    </span>
+                    <div className="flex flex-col items-end">
+                      <span className="px-3 py-1 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-black rounded-lg uppercase tracking-widest shadow-sm">
+                        Grade A+
+                      </span>
+                      <p className="text-[9px] font-bold text-emerald-500 mt-1 uppercase tracking-tighter">Verified AI Audit</p>
+                    </div>
                   </div>
 
                   <div className="mt-auto">
                     <button
                       onClick={() => reserveProduct(item.name)}
-                      className="w-full py-4 bg-primary text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-secondary hover:text-primary transition-all duration-300 shadow-md"
+                      className="w-full py-5 bg-primary text-white rounded-2xl font-black text-lg flex items-center justify-center gap-3 hover:bg-secondary hover:text-primary transition-all duration-500 shadow-2xl hover:scale-[1.02] active:scale-95"
                     >
-                      Reserve Now
-                      <ArrowRight size={18} />
+                      Reserve This Catch
+                      <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />
                     </button>
                   </div>
                 </div>

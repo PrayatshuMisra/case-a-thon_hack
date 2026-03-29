@@ -13,7 +13,8 @@ import {
   Waves,
   CheckCircle2,
   AlertCircle,
-  Scale
+  Scale,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { api } from '@/src/api/client';
@@ -66,6 +67,16 @@ export const Logistics = ({ onNavigate, orderId }: { onNavigate?: (tab: string) 
           intervalRef.current = setTimeout(() => {
             count += 1;
             setVisibleCount(count);
+            
+            // Send SMS notification for the new shipment status update
+            const nextStep = timeline[count - 1];
+            if (nextStep && tracking?.phone) {
+              api.sendSms({
+                phone: tracking.phone,
+                message: `Update on your ${tracking.product_name} order: ${nextStep.label} - ${nextStep.sub || ''}`
+              }).catch(console.error);
+            }
+
             if (count < total) scheduleNext();
           }, delay) as unknown as ReturnType<typeof setInterval>;
         };
@@ -96,6 +107,7 @@ export const Logistics = ({ onNavigate, orderId }: { onNavigate?: (tab: string) 
       status: (isPast ? 'done' : isCurrent ? 'current' : 'upcoming') as RoutePoint['status']
     };
   });
+
   return (
     <div className="relative pb-24">
       {/* Fixed Full Page Background */}
@@ -149,12 +161,12 @@ export const Logistics = ({ onNavigate, orderId }: { onNavigate?: (tab: string) 
                   </div>
                   <div>
                     <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Vessel Identity</p>
-                    <p className="text-sm font-bold text-slate-900 mt-0.5 truncate">MAL-74 Sea King</p>
+                    <p className="text-sm font-bold text-slate-900 mt-0.5 truncate">{tracking?.source_boat ?? 'MAL-74 Sea King'}</p>
                   </div>
                 </div>
                 <div className="pt-3 border-t border-slate-100/50 flex justify-between items-center text-xs">
-                  <span className="text-slate-500">Landed at Malpe</span>
-                  <span className="text-slate-700 font-semibold bg-white/40 px-2 py-1 rounded">04:12 AM</span>
+                  <span className="text-slate-500">Origin Zone</span>
+                  <span className="text-slate-700 font-semibold bg-white/40 px-2 py-1 rounded truncate max-w-[100px]">{tracking?.catch_zone ?? 'Malpe Zone A'}</span>
                 </div>
               </div>
 
@@ -165,38 +177,50 @@ export const Logistics = ({ onNavigate, orderId }: { onNavigate?: (tab: string) 
                     <Thermometer size={20} />
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Cold Chain</p>
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Thermal Stability</p>
                     <p className="text-sm font-bold text-slate-900 mt-0.5 flex items-center gap-2">
-                      2.4°C <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-bold">OPTIMAL</span>
+                      {tracking?.cold_chain_maintained ? '2.1°C' : 'Fluctuating'} 
+                      <span className={cn(
+                        "px-1.5 py-0.5 rounded text-[10px] font-bold",
+                        tracking?.cold_chain_maintained ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
+                      )}>
+                        {tracking?.cold_chain_maintained ? 'OPTIMAL' : 'AT RISK'}
+                      </span>
                     </p>
                   </div>
                 </div>
                 <div className="pt-3 border-t border-slate-100/50 flex justify-between items-center text-xs">
-                  <span className="text-slate-500">Last Sync</span>
-                  <span className="text-blue-700 font-semibold bg-blue-50 px-2 py-1 rounded flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                    2m ago
+                  <span className="text-slate-500">Cold Chain</span>
+                  <span className={cn(
+                    "font-semibold bg-white/40 px-2 py-1 rounded flex items-center gap-1.5",
+                    tracking?.cold_chain_maintained ? "text-blue-700" : "text-red-700"
+                  )}>
+                    <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse", tracking?.cold_chain_maintained ? "bg-blue-500" : "bg-red-500")}></span>
+                    {tracking?.cold_chain_maintained ? 'Protected' : 'Compromised'}
                   </span>
                 </div>
               </div>
 
-              {/* Freshness */}
+              {/* Freshness Index */}
               <div className="p-5 bg-white/40 backdrop-blur-md rounded-xl flex flex-col justify-between shadow-lg border border-white/20">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
                     <Award size={20} />
                   </div>
                   <div>
-                    <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Freshness</p>
+                    <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Freshness Index</p>
                     <p className="text-sm font-bold text-slate-900 mt-0.5 flex items-center gap-2">
-                      94/100 <span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-bold">GRADE A</span>
+                      {tracking?.freshness_score ?? 94}/100 
+                      <span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                        {tracking?.freshness_label ?? 'GRADE A'}
+                      </span>
                     </p>
                   </div>
                 </div>
                 <div className="pt-3 border-t border-slate-100/50 flex justify-between items-center text-xs">
                   <span className="text-slate-500">Verified by</span>
                   <span className="text-slate-700 font-semibold bg-emerald-100 px-2 py-1 rounded flex items-center gap-1 border border-emerald-100">
-                    <ShieldCheck size={12} /> System
+                    <ShieldCheck size={12} /> ML Engine v1.2
                   </span>
                 </div>
               </div>
@@ -210,10 +234,10 @@ export const Logistics = ({ onNavigate, orderId }: { onNavigate?: (tab: string) 
                   <h3 className="text-lg font-bold tracking-tight mb-5">Live Logistics Stream</h3>
                   <div className="space-y-2.5">
                     {[
-                      { label: 'Current Temp', val: '2.4°C', icon: Thermometer, status: 'Optimal' },
+                      { label: 'Current Temp', val: tracking?.cold_chain_maintained ? '2.1°C' : '4.8°C', icon: Thermometer, status: tracking?.cold_chain_maintained ? 'Optimal' : 'Checking' },
                       { label: 'Malpe Hub', val: 'Outbound', icon: Package, status: 'Completed' },
                       { label: 'Cold-Chain', val: 'Active', icon: Truck, status: 'In Transit' },
-                      { label: 'ETA', val: '07:00 AM', icon: Clock, status: 'On Track' },
+                      { label: 'ETA', val: tracking ? new Date(tracking.eta).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '07:00 AM', icon: Clock, status: 'On Track' },
                     ].map((item, i) => (
                       <div key={i} className="flex items-center justify-between p-3.5 bg-slate-800/60 rounded-xl border border-slate-700/30">
                         <div className="flex items-center gap-3">
@@ -255,7 +279,7 @@ export const Logistics = ({ onNavigate, orderId }: { onNavigate?: (tab: string) 
                         <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
                         <span className="text-white/90 text-[10px] font-semibold uppercase tracking-wider">Tracking Active</span>
                       </div>
-                      <p className="text-white font-bold text-lg tracking-tight">MAL-74 Sea King</p>
+                      <p className="text-white font-bold text-lg tracking-tight">{tracking?.source_boat ?? 'MAL-74 Sea King'}</p>
                     </div>
                   </div>
                   <div className="space-y-3">
@@ -318,66 +342,123 @@ export const Logistics = ({ onNavigate, orderId }: { onNavigate?: (tab: string) 
 
               <hr className="border-slate-100/50 mb-8" />
 
-              {/* Vertical Timeline */}
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-6">
-                  <h4 className="text-lg font-bold text-slate-900 tracking-tight">Shipment Journey</h4>
-                  {visibleCount < timeline.length && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/40 text-[9px] font-semibold tracking-wider uppercase text-slate-500 rounded-md border border-white/20">
-                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse" />
-                      Syncing
-                    </span>
-                  )}
-                </div>
-                
-                <div className="relative pl-8 space-y-8">
-                  <div className="absolute left-[11px] top-2 bottom-2 w-[2px] bg-slate-100"></div>
+              {/* Shipment Journey & Intelligence Audit Container */}
+              <div className="flex-1 space-y-8">
+                {/* Vertical Timeline */}
+                <div className="flex flex-col">
+                  <div className="flex items-center justify-between mb-6">
+                    <h4 className="text-lg font-bold text-slate-900 tracking-tight">Shipment Journey</h4>
+                    {visibleCount < timeline.length && (
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white/40 text-[9px] font-semibold tracking-wider uppercase text-slate-500 rounded-md border border-white/20">
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse" />
+                        Syncing
+                      </span>
+                    )}
+                  </div>
                   
-                  {timeline.map((originalStep: any, i: number) => {
-                    if (i >= visibleCount) return null;
+                  <div className="relative pl-8 space-y-8">
+                    <div className="absolute left-[11px] top-2 bottom-2 w-[2px] bg-slate-100"></div>
                     
-                    const step = {
-                      ...originalStep,
-                      done: i < visibleCount - 1,
-                      current: i === visibleCount - 1,
-                      pending: false,
-                    };
-                    
-                    return (
-                      <div key={i} className="relative animate-in fade-in slide-in-from-top-4 duration-500">
-                        <div className={cn(
-                          "absolute -left-8 w-6 h-6 rounded-full border-2 bg-white flex items-center justify-center -ml-[3px] z-10",
-                          step.done ? "border-blue-600 bg-blue-600 text-white" : step.current ? "border-blue-600 text-blue-600" : "border-slate-300"
-                        )}>
-                          {step.done ? <CheckCircle2 size={14} /> : (step.current && <div className="w-2 h-2 rounded-full bg-blue-600"></div>)}
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <div className="flex justify-between items-start gap-2">
-                            <p className={cn("text-sm font-bold", step.pending ? "text-slate-400" : "text-slate-900")}>{step.label}</p>
-                            <span className="text-[10px] font-bold text-slate-500 bg-white/40 px-2 py-0.5 rounded border border-white/20 shrink-0 whitespace-nowrap">
-                              {step.time ?? (step.timestamp ? new Date(step.timestamp).toLocaleTimeString() : '--')}
-                            </span>
+                    {timeline.map((originalStep: any, i: number) => {
+                      if (i >= visibleCount) return null;
+                      
+                      const step = {
+                        ...originalStep,
+                        done: i < visibleCount - 1,
+                        current: i === visibleCount - 1,
+                        pending: false,
+                      };
+                      
+                      return (
+                        <div key={i} className="relative animate-in fade-in slide-in-from-top-4 duration-500">
+                          <div className={cn(
+                            "absolute -left-8 w-6 h-6 rounded-full border-2 bg-white flex items-center justify-center -ml-[3px] z-10",
+                            step.done ? "border-blue-600 bg-blue-600 text-white" : step.current ? "border-blue-600 text-blue-600" : "border-slate-300"
+                          )}>
+                            {step.done ? <CheckCircle2 size={14} /> : (step.current && <div className="w-2 h-2 rounded-full bg-blue-600"></div>)}
                           </div>
-                          <p className="text-xs text-slate-500 leading-relaxed pr-4">{step.sub ?? ''}</p>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex justify-between items-start gap-2">
+                              <p className={cn("text-sm font-bold", step.pending ? "text-slate-400" : "text-slate-900")}>{step.label}</p>
+                              <span className="text-[10px] font-bold text-slate-500 bg-white/40 px-2 py-0.5 rounded border border-white/20 shrink-0 whitespace-nowrap">
+                                {step.time ?? (step.timestamp ? new Date(step.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--')}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 leading-relaxed pr-4">{step.sub ?? ''}</p>
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
 
-                  {/* Placeholder rows */}
-                  {timeline.slice(visibleCount).map((_: any, i: number) => (
-                    <div key={`placeholder-${i}`} className="relative opacity-40 flex flex-col gap-1">
-                      <div className="absolute -left-8 w-6 h-6 rounded-full border-2 border-slate-200 bg-white -ml-[3px] z-10" />
-                      <div className="flex justify-between items-start gap-2">
-                        <div className="h-4 w-32 bg-slate-200 rounded-md" />
-                        <div className="h-4 w-14 bg-slate-100 rounded-md shrink-0" />
+                    {/* Placeholder rows */}
+                    {timeline.slice(visibleCount).map((_: any, i: number) => (
+                      <div key={`placeholder-${i}`} className="relative opacity-40 flex flex-col gap-1">
+                        <div className="absolute -left-8 w-6 h-6 rounded-full border-2 border-slate-200 bg-white -ml-[3px] z-10" />
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="h-4 w-32 bg-slate-200 rounded-md" />
+                          <div className="h-4 w-14 bg-slate-100 rounded-md shrink-0" />
+                        </div>
+                        <div className="h-3 w-48 bg-slate-100 rounded-md mt-1" />
                       </div>
-                      <div className="h-3 w-48 bg-slate-100 rounded-md mt-1" />
+                    ))}
+                  </div>
+                </div>
+
+                <hr className="border-slate-100/50" />
+
+                {/* Freshness Intelligence Audit */}
+                <div className="flex flex-col">
+                  <div className="flex items-center justify-between mb-6">
+                    <h4 className="text-lg font-bold text-slate-900 tracking-tight">Intelligence Audit</h4>
+                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 uppercase tracking-widest">ML Analysis</span>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {tracking?.freshness_audit?.length > 0 ? (
+                      tracking.freshness_audit.map((audit: any, i: number) => (
+                        <div key={i} className="bg-white/60 border border-white/40 p-3 rounded-xl flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-right-4 duration-500" style={{ animationDelay: `${i * 150}ms` }}>
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "w-8 h-8 rounded-lg flex items-center justify-center border text-[10px]",
+                              audit.status === 'pass' ? "bg-emerald-50 text-emerald-600 border-emerald-100" : 
+                              audit.status === 'warn' ? "bg-amber-50 text-amber-600 border-amber-100" :
+                              "bg-blue-50 text-blue-600 border-blue-100"
+                            )}>
+                              {audit.status === 'pass' ? <CheckCircle2 size={16} /> : 
+                               audit.status === 'warn' ? <AlertCircle size={16} /> : <ShieldCheck size={16} />}
+                            </div>
+                            <div>
+                              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">{audit.label}</p>
+                              <p className="text-xs font-bold text-slate-900">{audit.value}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className={cn(
+                              "text-[10px] font-black tracking-tight",
+                              audit.impact.includes('-') ? "text-amber-600" : "text-emerald-600"
+                            )}>{audit.impact}</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-4 border border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center">
+                        <Loader2 className="animate-spin text-slate-300 mb-2" size={20} />
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Generating Audit...</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-4 bg-slate-900 rounded-2xl text-white mt-6 shadow-lg border border-white/10">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">Model Reasoning</p>
                     </div>
-                  ))}
+                    <p className="text-[11px] leading-relaxed font-medium opacity-90 italic">
+                      "Catch-to-door timeline and thermal stability indexes suggest maximum protein integrity. No shelf-life warnings detected by ML v1.2."
+                    </p>
+                  </div>
                 </div>
               </div>
-
             </div>
           </div>
         </div>

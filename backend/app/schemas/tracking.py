@@ -9,10 +9,18 @@ class TrackingStage(BaseModel):
     current: bool = False
 
 
+class FreshnessAuditItem(BaseModel):
+    label: str
+    value: str
+    status: str  # 'pass', 'warn', 'info'
+    impact: str
+
+
 class OrderTrackingResponse(BaseModel):
     order_id: str
     status: str
     customer_name: str
+    phone: str
     apartment_name: str
     locality: str
     product_name: str
@@ -25,3 +33,4 @@ class OrderTrackingResponse(BaseModel):
     cold_chain_maintained: bool
     eta: str
     timeline: list[TrackingStage]
+    freshness_audit: list[FreshnessAuditItem] = []

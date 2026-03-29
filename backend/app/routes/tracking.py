@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException
 from app.db.store import store
 from app.db.supabase_client import get_supabase_client
 from app.schemas.tracking import OrderTrackingResponse
+from app.services.freshness_engine import calculate_freshness_intelligence
 
 router = APIRouter()
 
@@ -88,20 +89,32 @@ def get_tracking(order_id: str):
         for i, (key, label, ts) in enumerate(stages)
     ]
 
+    intel = calculate_freshness_intelligence(
+        catch_time=catch_time,
+        landing_time=landing_time,
+        packing_time=packing_time,
+        dispatch_time=dispatch_time,
+        arrival_eta=arrival_eta,
+        species=shipment.get("species", "Mixed"),
+        cold_chain_ok=bool(shipment.get("cold_chain_ok", True)),
+    )
+
     return {
         "order_id":            order.get("id", order_id),
         "status":              order.get("status", "Reserved"),
         "customer_name":       order.get("customer_name", ""),
+        "phone":               order.get("phone", "+919999999999"),
         "apartment_name":      order.get("apartment_name", ""),
         "locality":            order.get("locality", ""),
         "product_name":        order.get("product_name", ""),
         "quantity_kg":         float(order.get("quantity_kg", 0)),
         "total_amount":        float(order.get("total_amount", 0)),
-        "freshness_score":     float(order.get("freshness_score", 0)),
-        "freshness_label":     order.get("freshness_label", "Fresh"),
+        "freshness_score":     intel["freshness_score"],
+        "freshness_label":     intel["freshness_label"],
         "source_boat":         shipment.get("source_boat", "MALPE-07"),
         "catch_zone":          "Arabian Sea - Malpe Zone A",
         "cold_chain_maintained": bool(shipment.get("cold_chain_ok", True)),
         "eta":                 arrival_eta.isoformat() if arrival_eta else "",
         "timeline":            timeline,
+        "freshness_audit":     intel["audit"],
     }

@@ -227,4 +227,12 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(payload),
   }),
+
+  sendSms: (payload: {
+    phone: string;
+    message: string;
+  }) => request('/api/sms/send', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
 };

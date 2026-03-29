@@ -45,7 +45,7 @@ def calculate_freshness_intelligence(
     cold_chain_ok: bool,
     reference_time: datetime | None = None,
 ) -> dict:
-    """Return freshness intelligence and pricing hints using weighted degradation logic."""
+    """Return freshness intelligence and pricing hints using weighted multi-factor logic."""
     now = reference_time or datetime.now(timezone.utc)
     species_factor = SPECIES_SENSITIVITY.get(species.lower(), 1.0)
 
@@ -55,12 +55,55 @@ def calculate_freshness_intelligence(
     eta_hours = _hours_between(now, arrival_eta)
 
     score = 100.0
-    score -= hours_since_catch * 1.5 * species_factor
-    score -= packing_delay * 1.0 * species_factor
-    score -= dispatch_delay * 1.2
-    score -= max(eta_hours - 8, 0) * 0.8
-    if not cold_chain_ok:
-        score -= 18
+    audit = []
+
+    # 1. Catch to Now (Overall Age)
+    age_penalty = round(hours_since_catch * 1.2 * species_factor, 1)
+    score -= age_penalty
+    audit.append({
+        "label": "Time Since Catch",
+        "value": f"{round(hours_since_catch, 1)}h",
+        "status": "pass" if hours_since_catch < 12 else "warn",
+        "impact": f"-{age_penalty} pts"
+    })
+
+    # 2. Thermal Stability
+    if cold_chain_ok:
+        thermal_bonus = 2.5
+        score += thermal_bonus
+        audit.append({
+            "label": "Thermal Stability",
+            "value": "2°C - 4°C",
+            "status": "pass",
+            "impact": f"+{thermal_bonus} pts (Stable)"
+        })
+    else:
+        score -= 15
+        audit.append({
+            "label": "Cold-Chain Integrity",
+            "value": "Drift Detected",
+            "status": "at_risk",
+            "impact": "-15.0 pts"
+        })
+
+    # 3. Processing Efficiency
+    process_penalty = round(packing_delay * 0.8 * species_factor, 1)
+    score -= process_penalty
+    audit.append({
+        "label": "Hub Processing",
+        "value": f"Landed to Packed in {round(packing_delay, 1)}h",
+        "status": "pass" if packing_delay < 3 else "info",
+        "impact": f"-{process_penalty} pts"
+    })
+
+    # 4. Species Sensitivity
+    if species_factor > 1.1:
+        audit.append({
+            "label": "Species Stability",
+            "value": f"{species.capitalize()} (High Decay)",
+            "status": "info",
+            "impact": "Increased weighting applied"
+        })
 
     score = max(0.0, min(100.0, round(score, 1)))
     return {
@@ -68,4 +111,5 @@ def calculate_freshness_intelligence(
         "freshness_label": _label(score),
         "spoilage_risk": _spoilage_risk(score),
         "flash_drop": score < 80,
+        "audit": audit
     }
