@@ -1,0 +1,34 @@
+{
+  "name": "bharat-call-rn",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "web": "expo start --web",
+    "typecheck": "tsc --noEmit",
+    "server": "node server/index.js",
+    "server:watch": "node --watch server/index.js"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^15.1.1",
+    "@supabase/supabase-js": "^2.100.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "expo": "~54.0.0",
+    "expo-av": "~15.1.6",
+    "expo-constants": "^55.0.9",
+    "expo-speech": "~14.0.7",
+    "expo-status-bar": "~3.0.8",
+    "express": "^5.2.1",
+    "multer": "^2.1.1",
+    "react": "19.1.0",
+    "react-native": "0.81.4",
+    "react-native-safe-area-context": "^5.7.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.10",
+    "typescript": "~5.9.2"
+  }
+}

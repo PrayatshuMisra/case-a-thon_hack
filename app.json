@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Bharat Setu Call",
+    "slug": "bharat-call-rn",
+    "scheme": "bharatsetu",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "permissions": [
+        "RECORD_AUDIO",
+        "INTERNET"
+      ]
+    }
+  }
+}
