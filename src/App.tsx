@@ -11,6 +11,7 @@ import { Logistics } from './pages/Logistics';
 import { ProofEngine } from './pages/ProofEngine';
 import { FisherStudio } from './pages/FisherStudio';
 import { DemandCapture } from './pages/DemandCapture';
+import { Settings } from './pages/Settings';
 import { motion, AnimatePresence } from 'motion/react';
 
 type Persona = 'consumer' | 'admin';
@@ -53,6 +54,7 @@ const App = () => {
     return savedPersona === 'admin' ? 'dashboard' : 'home';
   });
   const [latestOrderId, setLatestOrderId] = useState<string | null>(() => localStorage.getItem('latest_order_id'));
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const applyHistory = (tab: string, mode: 'push' | 'replace' = 'push') => {
     const path = TAB_TO_PATH[tab] ?? '/home';
@@ -133,8 +135,9 @@ const App = () => {
         return <Logistics onNavigate={navigate} orderId={latestOrderId} />;
       case 'proof':
       case 'investors':
-      case 'settings':
         return <ProofEngine />;
+      case 'settings':
+        return <Settings />;
       case 'fisher':
       case 'loi':
         return <FisherStudio initialTab={activeTab === 'loi' ? 'loi' : 'onboarding'} />;
@@ -152,10 +155,16 @@ const App = () => {
 
       {isAdminPage ? (
         <div className="flex">
-          <Sidebar activeTab={activeTab} setActiveTab={navigate} />
-          <main className="flex-1 ml-64 min-h-screen">
-            <TopNav activeTab={activeTab} onNavigate={navigate} persona={persona} onPersonaChange={switchPersona} />
-            <div className="p-8 lg:p-12 max-w-screen-2xl mx-auto">
+          <Sidebar activeTab={activeTab} setActiveTab={navigate} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+          <main className="flex-1 lg:ml-64 min-h-screen relative">
+            <TopNav 
+              activeTab={activeTab} 
+              onNavigate={navigate} 
+              persona={persona} 
+              onPersonaChange={switchPersona} 
+              onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+            />
+            <div className="p-4 md:p-8 lg:p-12 max-w-screen-2xl mx-auto">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeTab}

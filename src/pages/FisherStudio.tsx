@@ -333,8 +333,17 @@ function generateFisherOnboardingPdf(fisher: any, upliftPct: number) {
 // ─── Component ────────────────────────────────────────────────────────────────
 export const FisherStudio = ({ initialTab = 'onboarding' }: Props) => {
   const [activeSubTab, setActiveSubTab] = useState<'onboarding' | 'loi'>(initialTab);
-  const [fishers, setFishers] = useState<any[]>([]);
-  const [lois, setLois] = useState<any[]>([]);
+  const [fishers, setFishers] = useState<any[]>(() => {
+    const cached = localStorage.getItem('mm_fishers');
+    return cached ? JSON.parse(cached) : [];
+  });
+  const [lois, setLois] = useState<any[]>(() => {
+    const cached = localStorage.getItem('mm_lois');
+    return cached ? JSON.parse(cached) : [];
+  });
+
+  const [loading, setLoading] = useState(!fishers.length);
+  const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState<'success' | 'error'>('success');
@@ -366,13 +375,31 @@ export const FisherStudio = ({ initialTab = 'onboarding' }: Props) => {
     setActiveSubTab(initialTab);
   }, [initialTab]);
 
-  const loadData = () => {
-    api.getFishers().then(setFishers).catch(() => {});
-    api.getLois().then(setLois).catch(() => {});
+  const fetchData = async (isBackground = false) => {
+    if (isBackground) setRefreshing(true);
+    else setLoading(true);
+
+    try {
+      const [newFishers, newLois] = await Promise.all([
+        api.getFishers(),
+        api.getLois()
+      ]);
+      setFishers(newFishers);
+      setLois(newLois);
+      localStorage.setItem('mm_fishers', JSON.stringify(newFishers));
+      localStorage.setItem('mm_lois', JSON.stringify(newLois));
+    } catch {
+      // Keep existing
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   useEffect(() => {
-    loadData();
+    fetchData();
+    const poll = setInterval(() => fetchData(true), 30000);
+    return () => clearInterval(poll);
   }, []);
 
   const filteredFishers = useMemo(
@@ -398,7 +425,7 @@ export const FisherStudio = ({ initialTab = 'onboarding' }: Props) => {
       }
       generateFisherOnboardingPdf(fisherForm, getFisherUplift(addedFisher || fisherForm));
       setFisherForm((prev) => ({ ...prev, name: '', boat_id: '', mobile_number: '' }));
-      loadData();
+      fetchData(true);
     } catch (err: any) {
       notify(`❌ Onboarding failed: ${err?.message ?? err}`, 'error');
     }
@@ -414,7 +441,7 @@ export const FisherStudio = ({ initialTab = 'onboarding' }: Props) => {
       const created = await api.generateLoi({ ...loiForm, status: 'Draft' }) as any;
       notify('✅ LOI generated and saved.');
       setPreviewLoi({ ...loiForm, id: created?.id });
-      loadData();
+      fetchData(true);
     } catch (err: any) {
       notify(`❌ LOI generation failed: ${err?.message ?? err}`, 'error');
     }
@@ -449,12 +476,18 @@ export const FisherStudio = ({ initialTab = 'onboarding' }: Props) => {
       {/* ── Page Header ── */}
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-1">
-          <h2 className="text-3xl font-extrabold tracking-tight text-primary">Fisher Studio</h2>
-          <p className="text-on-surface-variant font-medium">
+          <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-primary">Fisher Studio</h2>
+          <p className="text-on-surface-variant font-medium text-sm md:text-base">
             Empowering Malpe fishing families with digital onboarding and institutional proof.
           </p>
         </div>
-        <div className="flex bg-surface-container-low p-1.5 rounded-2xl gap-1">
+        <div className="flex bg-surface-container-low p-1.5 rounded-2xl gap-1 items-center self-start md:self-auto overflow-x-auto max-w-full">
+          {refreshing && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase tracking-widest animate-pulse border border-blue-100 mr-2">
+              <RefreshCw size={12} className="animate-spin" />
+              Syncing Live
+            </div>
+          )}
           <button
             onClick={() => setActiveSubTab('onboarding')}
             className={cn(
@@ -493,12 +526,12 @@ export const FisherStudio = ({ initialTab = 'onboarding' }: Props) => {
       {activeSubTab === 'onboarding' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Form */}
-          <div className="lg:col-span-5 premium-card p-10 premium-hover">
+          <div className="lg:col-span-5 premium-card p-6 md:p-10 premium-hover">
             <div className="flex items-center gap-3 mb-8">
               <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center">
                 <Plus size={20} />
               </div>
-              <h3 className="text-xl font-bold font-manrope text-primary">Fisher Onboarding</h3>
+              <h3 className="text-lg md:text-xl font-bold font-manrope text-primary">Fisher Onboarding</h3>
             </div>
             <form onSubmit={submitFisher} className="space-y-5">
               {[
@@ -562,8 +595,8 @@ export const FisherStudio = ({ initialTab = 'onboarding' }: Props) => {
 
           {/* Fisher list */}
           <div className="lg:col-span-7 space-y-8">
-            <div className="premium-card p-10">
-              <div className="flex justify-between items-center mb-8">
+            <div className="premium-card p-6 md:p-10">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-secondary text-white flex items-center justify-center">
                     <Users size={20} />
@@ -586,13 +619,26 @@ export const FisherStudio = ({ initialTab = 'onboarding' }: Props) => {
                   <button onClick={() => setSearch('')} className="p-2 bg-white rounded-lg shadow-sm text-slate-400 hover:text-primary transition-colors">
                     <Filter size={16} />
                   </button>
-                  <button onClick={loadData} className="p-2 bg-white rounded-lg shadow-sm text-slate-400 hover:text-primary transition-colors" title="Refresh">
-                    <RefreshCw size={16} />
+                  <button onClick={() => fetchData()} className="p-2 bg-white rounded-lg shadow-sm text-slate-400 hover:text-primary transition-colors" title="Refresh">
+                    <RefreshCw size={16} className={(loading || refreshing) ? 'animate-spin' : ''} />
                   </button>
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {(filteredFishers.length > 0 ? filteredFishers : fishers.length === 0 ? [
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative min-h-[160px]">
+                {loading && !fishers.length ? (
+                  <>
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="bg-slate-50 p-5 rounded-3xl border border-slate-100 flex items-center gap-4 skeleton-pulse relative overflow-hidden">
+                        <div className="absolute inset-0 shimmer-box opacity-[0.03]"></div>
+                        <div className="w-14 h-14 rounded-2xl bg-slate-200/50 shrink-0"></div>
+                        <div className="flex-1 space-y-2">
+                          <div className="h-4 w-24 bg-slate-200/50 rounded"></div>
+                          <div className="h-3 w-16 bg-slate-200/50 rounded"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                ) : (filteredFishers.length > 0 ? filteredFishers : fishers.length === 0 ? [
                   { name: 'K. Manjunath', boat_id: 'MAL-74', species_focus: 'Seer Fish', status: 'Verified' },
                   { name: 'S. Raghavan', boat_id: 'MAL-31', species_focus: 'Pomfret', status: 'Verified' },
                 ] : []).map((fisher, i) => (
@@ -622,7 +668,7 @@ export const FisherStudio = ({ initialTab = 'onboarding' }: Props) => {
                     <ChevronRight size={16} className="text-slate-300 group-hover:text-secondary transition-colors shrink-0" />
                   </div>
                 ))}
-                {filteredFishers.length === 0 && fishers.length > 0 && (
+                {!loading && filteredFishers.length === 0 && fishers.length > 0 && (
                   <p className="col-span-2 text-sm text-slate-400 text-center py-8">No fishers match your search.</p>
                 )}
               </div>
@@ -741,11 +787,11 @@ export const FisherStudio = ({ initialTab = 'onboarding' }: Props) => {
             </div>
 
             {/* Saved LOIs */}
-            <div className="bg-surface-container-low rounded-[2.5rem] p-8">
+            <div className="bg-surface-container-low rounded-[1.5rem] md:rounded-[2.5rem] p-4 md:p-8">
               <div className="flex items-center justify-between mb-6">
                 <h4 className="text-sm font-black text-primary uppercase tracking-widest">Saved LOIs</h4>
-                <button onClick={loadData} className="text-slate-400 hover:text-primary transition-colors">
-                  <RefreshCw size={14} />
+                <button onClick={() => fetchData()} className="text-slate-400 hover:text-primary transition-colors">
+                  <RefreshCw size={14} className={(loading || refreshing) ? 'animate-spin' : ''} />
                 </button>
               </div>
               <div className="space-y-3">

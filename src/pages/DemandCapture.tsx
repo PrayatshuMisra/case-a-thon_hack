@@ -27,20 +27,7 @@ import {
 import { cn } from '@/src/lib/utils';
 import { api, type DashboardMetrics, type TomorrowRecommendation } from '@/src/api/client';
 
-// ─── Fallback seed (only used when Supabase returns 0 rows) ──────────────────
-const FALLBACK_LOCALITY = [
-  { name: 'Whitefield', value: 12, conv: 0.14 },
-  { name: 'Indiranagar', value: 5, conv: 0.11 },
-  { name: 'HSR Layout', value: 4, conv: 0.09 },
-  { name: 'Koramangala', value: 3, conv: 0.08 },
-  { name: 'Bellandur', value: 2, conv: 0.07 },
-];
-
-const FALLBACK_PRODUCT = [
-  { name: 'Seer Fish', value: 48, color: '#001e40' },
-  { name: 'Pomfret', value: 32, color: '#006a6a' },
-  { name: 'Prawns', value: 20, color: '#611b00' },
-];
+// Removed legacy mock data constants. Dashboard now prioritizes verified telemetry.
 
 const PRODUCT_COLORS: Record<string, string> = {
   'Seer Fish': '#001e40',
@@ -64,27 +51,52 @@ const CONFIDENCE_COLORS: Record<string, string> = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export const DemandCapture = () => {
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [recommendation, setRecommendation] = useState<TomorrowRecommendation | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(() => {
+    const cached = localStorage.getItem('mm_dashboard_metrics');
+    return cached ? JSON.parse(cached) : null;
+  });
+  const [recommendation, setRecommendation] = useState<TomorrowRecommendation | null>(() => {
+    const cached = localStorage.getItem('mm_tomorrow_recommendation');
+    return cached ? JSON.parse(cached) : null;
+  });
+
+  const [loading, setLoading] = useState(!metrics);
+  const [refreshing, setRefreshing] = useState(false);
   const [logStatus, setLogStatus] = useState('');
   const [loggedArms, setLoggedArms] = useState<Set<string>>(new Set());
   const [activeLocality, setActiveLocality] = useState<string | null>(null);
 
-  const load = () => {
-    setLoading(true);
-    Promise.all([
-      api.getDashboardMetrics().then(setMetrics).catch(() => {}),
-      api.getTomorrowRecommendation().then(setRecommendation).catch(() => {}),
-    ]).finally(() => setLoading(false));
+  const fetchData = async (isBackground = false) => {
+    if (isBackground) setRefreshing(true);
+    else setLoading(true);
+
+    try {
+      const [newMetrics, newRec] = await Promise.all([
+        api.getDashboardMetrics(),
+        api.getTomorrowRecommendation()
+      ]);
+      setMetrics(newMetrics);
+      setRecommendation(newRec);
+      localStorage.setItem('mm_dashboard_metrics', JSON.stringify(newMetrics));
+      localStorage.setItem('mm_tomorrow_recommendation', JSON.stringify(newRec));
+    } catch {
+      // Keep existing data
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    fetchData();
+    const poll = setInterval(() => fetchData(true), 30000);
+    return () => clearInterval(poll);
+  }, []);
 
   // ── Derived locality demand ────────────────────────────────────────────────
   const localityData = useMemo(() => {
     const raw = metrics?.charts.apartment_demand_split;
-    if (!raw?.length) return FALLBACK_LOCALITY;
+    if (!raw?.length) return [];
     const total = raw.reduce((s, r) => s + r.value, 0) || 1;
     return raw
       .sort((a, b) => b.value - a.value)
@@ -98,7 +110,7 @@ export const DemandCapture = () => {
   // ── Derived product mix ───────────────────────────────────────────────────
   const productData = useMemo(() => {
     const raw = metrics?.charts.product_demand_split;
-    if (!raw?.length) return FALLBACK_PRODUCT;
+    if (!raw?.length) return [];
     const total = raw.reduce((s, r) => s + r.value, 0) || 1;
     return raw
       .sort((a, b) => b.value - a.value)
@@ -180,22 +192,28 @@ export const DemandCapture = () => {
             Real-time buyer intent, locality heatmaps, and ML-optimised arm selection for tomorrow's drop.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-2 text-xs font-bold text-secondary bg-secondary/10 px-4 py-2 rounded-full">
-            <span className="w-2 h-2 rounded-full bg-secondary animate-pulse" />
-            {loading ? 'Loading...' : `${totalOrders} orders this week`}
+        <div className="flex items-center gap-4">
+          {refreshing && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-[10px] font-black uppercase tracking-widest animate-pulse border border-blue-100">
+              <RefreshCw size={12} className="animate-spin" />
+              Syncing Live
+            </div>
+          )}
+          <span className="flex items-center gap-2 text-xs font-bold text-secondary bg-secondary/10 px-4 py-2 rounded-full border border-secondary/20">
+            <span className={cn("w-2 h-2 rounded-full", refreshing ? "bg-blue-500 animate-pulse" : "bg-secondary")} />
+            {loading && !metrics ? 'Initializing...' : `${totalOrders} orders this week`}
           </span>
           <button
-            onClick={load}
+            onClick={() => fetchData()}
             className="p-2.5 bg-white rounded-xl shadow-sm border border-slate-100 text-slate-500 hover:text-primary transition-colors"
           >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={16} className={(loading || refreshing) ? 'animate-spin' : ''} />
           </button>
         </div>
       </header>
 
       {/* ── KPI Strip ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {[
           {
             label: 'Forecast GMV (Tomorrow)',
@@ -222,12 +240,21 @@ export const DemandCapture = () => {
             color: 'text-rose-600',
           },
         ].map((kpi) => (
-          <div key={kpi.label} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-start gap-4">
-            <div className={cn('mt-0.5', kpi.color)}>
+          <div key={kpi.label} className={cn(
+            "bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex items-start gap-4 transition-all relative overflow-hidden",
+            (loading && !metrics) ? "skeleton-pulse shadow-inner" : ""
+          )}>
+            {(loading && !metrics) && <div className="absolute inset-0 shimmer-box opacity-[0.03]"></div>}
+            
+            <div className={cn('mt-0.5 shrink-0', kpi.color)}>
               <kpi.icon size={22} />
             </div>
             <div>
-              <p className="text-2xl font-black text-primary">{kpi.value}</p>
+              {loading && !metrics ? (
+                <div className="h-7 w-20 bg-slate-200/50 rounded-md animate-pulse mb-1"></div>
+              ) : (
+                <p className="text-2xl font-black text-primary leading-none">{kpi.value}</p>
+              )}
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{kpi.label}</p>
             </div>
           </div>
@@ -274,7 +301,7 @@ export const DemandCapture = () => {
                 const confColor = CONFIDENCE_COLORS[arm.confidence_band] ?? '#64748b';
                 const channelColor = CHANNEL_COLORS[arm.channel] ?? '#64748b';
                 return (
-                  <div key={arm.arm_id} className="bg-white rounded-2xl border border-slate-100 p-5 hover:shadow-md transition-shadow">
+                  <div key={arm.arm_id} className="bg-white rounded-2xl border border-slate-100 p-4 md:p-5 hover:shadow-md transition-shadow">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black text-white shrink-0"
@@ -328,7 +355,7 @@ export const DemandCapture = () => {
           ) : (
             <div className="bg-surface-container-low rounded-2xl p-8 text-center">
               <p className="text-sm text-slate-500">ML arm data unavailable — backend recommendation service may be offline.</p>
-              <button onClick={load} className="mt-3 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold">Retry</button>
+              <button onClick={() => fetchData()} className="mt-3 px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold">Retry</button>
             </div>
           )}
 
@@ -350,27 +377,32 @@ export const DemandCapture = () => {
 
         {/* Weekly trend + Buyer Funnel */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+          <div className="bg-white rounded-2xl border border-slate-100 p-4 md:p-6 shadow-sm relative overflow-hidden h-auto sm:h-[300px]">
             <h3 className="text-base font-bold text-primary mb-1">Weekly Order Trend</h3>
             <p className="text-[10px] text-slate-400 uppercase tracking-widest mb-5">Orders per day (live from Supabase)</p>
-            <div className="h-44">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={weeklyTrend.length ? weeklyTrend : []}>
-                  <defs>
-                    <linearGradient id="dcGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#006a6a" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#006a6a" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={28} />
-                  <Tooltip formatter={(v: any) => [`${v} orders`, 'Volume']} />
-                  <Area type="monotone" dataKey="orders" stroke="#006a6a" strokeWidth={2.5} fill="url(#dcGrad)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-            {weeklyTrend.length === 0 && (
+            
+            {loading && !metrics ? (
+              <div className="absolute inset-0 shimmer-box skeleton-pulse opacity-10 m-6 rounded-xl"></div>
+            ) : (
+              <div className="h-44">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={weeklyTrend.length ? weeklyTrend : []}>
+                    <defs>
+                      <linearGradient id="dcGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#006a6a" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="#006a6a" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} width={28} />
+                    <Tooltip formatter={(v: any) => [`${v} orders`, 'Volume']} />
+                    <Area type="monotone" dataKey="orders" stroke="#006a6a" strokeWidth={2.5} fill="url(#dcGrad)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+            {weeklyTrend.length === 0 && !loading && (
               <p className="text-xs text-slate-400 text-center mt-2">No order data yet. Run seed.sql to populate.</p>
             )}
           </div>
@@ -410,7 +442,7 @@ export const DemandCapture = () => {
       {/* ── Row 2: Locality Heatmap + Product Mix ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Locality bar */}
-        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-100 p-4 md:p-6 shadow-sm">
           <div className="flex items-center justify-between mb-5">
             <div>
               <h3 className="text-base font-bold text-primary">Locality Demand Heatmap</h3>
@@ -492,7 +524,7 @@ export const DemandCapture = () => {
           </div>
 
           {/* Demand signals derived from real data */}
-          <div className="bg-primary text-white rounded-2xl p-6 relative overflow-hidden">
+          <div className="bg-primary text-white rounded-2xl p-4 md:p-6 relative overflow-hidden">
             <div className="relative z-10">
               <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-3">Demand Signals</p>
               <div className="space-y-3">

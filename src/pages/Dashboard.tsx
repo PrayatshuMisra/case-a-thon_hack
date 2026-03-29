@@ -8,7 +8,9 @@ import {
   Award,
   Download,
   ArrowUpRight,
-  AlertTriangle
+  AlertTriangle,
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import { 
   LineChart, 
@@ -39,28 +41,7 @@ import {
   type OrderRecord,
 } from '@/src/ml/pilot_decision_engine';
 
-const data = [
-  { name: 'Mon', value: 400 },
-  { name: 'Tue', value: 300 },
-  { name: 'Wed', value: 600 },
-  { name: 'Thu', value: 400 },
-  { name: 'Fri', value: 500 },
-  { name: 'Sat', value: 800 },
-  { name: 'Sun', value: 700 },
-];
-
-const demandData = [
-  { name: 'HSR', value: 120 },
-  { name: 'KRM', value: 85 },
-  { name: 'IND', value: 210 },
-  { name: 'WHT', value: 180 },
-];
-
-const productData = [
-  { name: 'Seer Fish', value: 48, color: '#001e40' },
-  { name: 'Pomfret', value: 32, color: '#006a6a' },
-  { name: 'Prawns', value: 20, color: '#611b00' },
-];
+// Removed legacy mock data constants to prioritize real backend telemetry.
 
 const PROCESSING_OPTION_IDS = ['pickling', 'drying_salting', 'minced_products', 'fish_silage', 'fishmeal', 'collagen', 'chitosan', 'fertilizer'] as const;
 const CHANNEL_DESTINATION: Record<'Customer' | 'Restaurant' | 'Retail' | 'Industrial', string> = {
@@ -74,8 +55,18 @@ const formatCurrency = (value: number): string => `₹${Math.round(value).toLoca
 const formatNullableCurrency = (value: number | null | undefined): string => (value == null ? 'N/A' : formatCurrency(value));
 
 export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }) => {
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [recommendation, setRecommendation] = useState<TomorrowRecommendation | null>(null);
+  // Load cached metrics instantly for zero-latency start
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(() => {
+    const cached = localStorage.getItem('mm_dashboard_metrics');
+    return cached ? JSON.parse(cached) : null;
+  });
+  const [recommendation, setRecommendation] = useState<TomorrowRecommendation | null>(() => {
+    const cached = localStorage.getItem('mm_tomorrow_recommendation');
+    return cached ? JSON.parse(cached) : null;
+  });
+  
+  const [loading, setLoading] = useState(!metrics);
+  const [refreshing, setRefreshing] = useState(false);
   const [status, setStatus] = useState('');
   const [range, setRange] = useState<'7D' | '30D'>('7D');
   const [selectedStockId, setSelectedStockId] = useState('stock-seer');
@@ -92,9 +83,34 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
     Record<string, { lastAction: string; at: string; suggestedPricePerKg?: number }>
   >({});
 
+  const fetchData = async (isBackground = false) => {
+    if (isBackground) setRefreshing(true);
+    else setLoading(true);
+
+    try {
+      const [newMetrics, newRec] = await Promise.all([
+        api.getDashboardMetrics(),
+        api.getTomorrowRecommendation()
+      ]);
+      
+      setMetrics(newMetrics);
+      setRecommendation(newRec);
+      localStorage.setItem('mm_dashboard_metrics', JSON.stringify(newMetrics));
+      localStorage.setItem('mm_tomorrow_recommendation', JSON.stringify(newRec));
+      setStatus('');
+    } catch (err) {
+      setStatus('Live sync delayed. Displaying last known verified metrics.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
-    api.getDashboardMetrics().then(setMetrics).catch(() => setStatus('Live metrics unavailable. Showing fallback values.'));
-    api.getTomorrowRecommendation().then(setRecommendation).catch(() => setStatus('ML recommendations unavailable.'));
+    fetchData();
+    // Background polling every 30 seconds for 'instant' live updates
+    const poll = setInterval(() => fetchData(true), 30000);
+    return () => clearInterval(poll);
   }, []);
 
   const logTopArmExperiment = async () => {
@@ -124,38 +140,52 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
   };
 
   const kpis = useMemo(() => {
+    const isLoading = loading && !metrics;
+
+    if (isLoading) {
+      return Array(6).fill(null).map((_, i) => ({
+        label: i === 0 ? 'Daily Orders' : i === 1 ? 'Revenue Captured' : i === 2 ? 'Repeat Proxy' : i === 3 ? 'Freshness Index' : i === 4 ? 'Active Fishers' : 'Signed LOIs',
+        value: '---',
+        loading: true,
+      }));
+    }
+
     if (!metrics) {
       return [
-        { label: 'Daily Orders', value: '42', trend: '+12%', color: 'bg-secondary' },
-        { label: 'Revenue Captured', value: '₹52,400', sub: 'Awaiting Settlement' },
-        { label: 'Repeat Proxy', value: '68%', progress: true },
-        { label: 'Freshness Score', value: '94.2', sub: 'Premium Grade', icon: Award },
-        { label: 'Active Fishers', value: '14', sub: 'Malpe Harbor Cluster' },
-        { label: 'Signed LOIs', value: '6', sub: 'Ready for Studio', alert: true },
+        { label: 'Daily Orders', value: 'N/A', trend: 'Offline', color: 'bg-slate-100' },
+        { label: 'Revenue Captured', value: '₹0', sub: 'No telemetry' },
+        { label: 'Repeat Proxy', value: '0%', progress: true },
+        { label: 'Freshness Score', value: '0', sub: 'No data', icon: Award },
+        { label: 'Active Fishers', value: '0', sub: 'Harbor sync failed' },
+        { label: 'Signed LOIs', value: '0', sub: 'Awaiting sync', alert: true },
       ];
     }
+
     return [
       { label: 'Daily Orders', value: String(metrics.kpis.daily_orders), trend: '+Live', color: 'bg-secondary' },
-      { label: 'Revenue Captured', value: `₹${metrics.kpis.revenue_captured}`, sub: 'Awaiting Settlement' },
+      { label: 'Revenue Captured', value: `₹${metrics.kpis.revenue_captured.toLocaleString('en-IN')}`, sub: 'Verified Settlement' },
       { label: 'Repeat Proxy', value: `${metrics.kpis.repeat_purchase_proxy}%`, progress: true },
       { label: 'Freshness Score', value: String(metrics.kpis.avg_freshness), sub: 'Premium Grade', icon: Award },
       { label: 'Active Fishers', value: String(metrics.kpis.active_fishers), sub: 'Malpe Harbor Cluster' },
       { label: 'Signed LOIs', value: String(metrics.kpis.signed_lois), sub: 'Ready for Studio', alert: true },
     ];
-  }, [metrics]);
+  }, [metrics, loading]);
 
-  const areaData = (() => {
-    const base = metrics?.charts.orders_over_time;
-    const src = (base && base.length > 0) ? base : data;
+  const areaData = useMemo(() => {
+    const src = metrics?.charts.orders_over_time ?? [];
+    if (!src.length) return [];
     return range === '7D' ? src : [...src, ...src, ...src, ...src.slice(0, 2)];
-  })();
-  const apartmentDemandData = (metrics?.charts.apartment_demand_split?.length)
-    ? metrics.charts.apartment_demand_split
-    : demandData;
-  const productDemandData = ((metrics?.charts.product_demand_split?.length)
-    ? metrics.charts.product_demand_split
-    : productData
-  ).map((item: any, idx: number) => ({ ...item, color: item.color ?? productData[idx % productData.length].color }));
+  }, [metrics, range]);
+
+  const apartmentDemandData = metrics?.charts.apartment_demand_split ?? [];
+  
+  const productDemandData = useMemo(() => {
+    const colors = ['#001e40', '#006a6a', '#611b00', '#004343'];
+    return (metrics?.charts.product_demand_split ?? []).map((item: any, idx: number) => ({
+      ...item,
+      color: item.color ?? colors[idx % colors.length]
+    }));
+  }, [metrics]);
 
   const localityPoints: RoutePoint[] = [
     { lat: 13.3409, lng: 74.7421, label: 'Malpe Harbor', subtitle: 'Source Cluster', status: 'done' },
@@ -815,25 +845,35 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
   };
   return (
     <div className="space-y-12">
-      <header className="flex justify-between items-end">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-1">
-          <h2 className="text-3xl font-extrabold tracking-tight text-primary">Operational Intelligence</h2>
-          <p className="text-on-surface-variant font-medium">Monitoring the bridge between Malpe and Bangalore's communities.</p>
+          <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-primary">Operational Intelligence</h2>
+          <p className="text-on-surface-variant font-medium text-sm md:text-base">Monitoring the bridge between Malpe and Bangalore's communities.</p>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center justify-between md:justify-end gap-6 w-full md:w-auto">
           <div className="text-right">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">System Status</p>
-            <p className="text-sm font-semibold text-secondary flex items-center justify-end">
-              <span className="w-2 h-2 rounded-full bg-secondary mr-2 animate-pulse"></span>
-              Live Nodes Active
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Telemetry Status</p>
+            <p className={cn(
+              "text-xs font-bold flex items-center justify-end gap-2",
+              refreshing ? "text-blue-600" : "text-emerald-600"
+            )}>
+              <span className={cn(
+                "w-2 h-2 rounded-full",
+                refreshing ? "bg-blue-500 animate-pulse" : "bg-emerald-500"
+              )}></span>
+              {refreshing ? <RefreshCw size={12} className="animate-spin" /> : null}
+              {refreshing ? 'Syncing Live' : 'Live Nodes Active'}
             </p>
           </div>
-          <img 
-            src="https://picsum.photos/seed/admin/100/100" 
-            alt="Admin" 
-            className="w-12 h-12 rounded-full border-2 border-white shadow-sm"
-            referrerPolicy="no-referrer"
-          />
+          <div className="relative shrink-0">
+            <img 
+              src="https://picsum.photos/seed/admin/100/100" 
+              alt="Admin" 
+              className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-white shadow-xl"
+              referrerPolicy="no-referrer"
+            />
+            {refreshing && <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 rounded-full border-2 border-white flex items-center justify-center animate-pulse"><Loader2 size={8} className="text-white animate-spin" /></div>}
+          </div>
         </div>
       </header>
 
@@ -869,38 +909,57 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
         )}
       </section>
 
-      <section className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
+      <section className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 md:gap-6">
         {kpis.map((kpi, i) => (
-          <div key={i} className="bg-surface-container-lowest p-5 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,30,64,0.06)] space-y-3">
-            <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">{kpi.label}</p>
-            <div className="flex items-baseline space-x-2">
-              <span className="text-2xl font-black text-primary">{kpi.value}</span>
-              {kpi.trend && <span className="text-xs font-bold text-secondary">{kpi.trend}</span>}
+          <div key={i} className={cn(
+            "bg-surface-container-lowest p-6 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,30,64,0.06)] relative overflow-hidden transition-all duration-300",
+            kpi.loading ? "skeleton-pulse ring-1 ring-slate-100/50" : "premium-hover"
+          )}>
+            {kpi.loading && <div className="absolute inset-0 shimmer-box opacity-[0.03]"></div>}
+            
+            <div className="flex justify-between items-start mb-4">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] leading-none">{kpi.label}</span>
+              {kpi.trend && !kpi.loading && (
+                <span className={cn(
+                  "px-2 py-0.5 rounded-full text-[9px] font-black tracking-widest uppercase border",
+                  kpi.color ? "bg-primary text-white border-primary" : "bg-emerald-50 text-emerald-600 border-emerald-100"
+                )}>
+                  {kpi.trend}
+                </span>
+              )}
             </div>
-            {kpi.progress && (
-              <div className="flex space-x-1">
-                <span className="w-full h-1 bg-secondary rounded-full"></span>
-                <span className="w-full h-1 bg-secondary rounded-full"></span>
-                <span className="w-1/2 h-1 bg-surface-container-low rounded-full"></span>
-              </div>
-            )}
-            {kpi.sub && (
-              <p className={cn("text-[10px] font-bold", kpi.alert ? "text-tertiary-container" : "text-slate-400")}>
-                {kpi.icon && <kpi.icon size={12} className="inline mr-1" />}
-                {kpi.sub}
-              </p>
-            )}
-            {kpi.color && !kpi.progress && (
-              <div className="h-1 bg-surface-container-low rounded-full overflow-hidden">
-                <div className={cn("h-full w-3/4", kpi.color)}></div>
-              </div>
-            )}
+            
+            <div className="flex items-baseline gap-2 mb-3">
+              {kpi.loading ? (
+                <div className="h-8 w-20 bg-slate-200/50 rounded-md animate-pulse"></div>
+              ) : (
+                <span className="text-3xl font-black text-primary tracking-tighter leading-none">{kpi.value}</span>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-1.5 leading-none min-h-[14px]">
+              {kpi.loading ? (
+                <div className="h-3 w-28 bg-slate-100/50 rounded-md animate-pulse"></div>
+              ) : (
+                <>
+                  {kpi.icon && <kpi.icon size={12} className="text-secondary" />}
+                  {kpi.sub && <span className="text-[10px] font-bold text-slate-500 tracking-tight">{kpi.sub}</span>}
+                  {kpi.progress && (
+                    <div className="flex grow space-x-1 h-1 mt-1">
+                      <span className="w-full bg-secondary rounded-full"></span>
+                      <span className="w-full bg-secondary rounded-full"></span>
+                      <span className="w-1/2 bg-slate-100 rounded-full"></span>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         ))}
       </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-8 bg-surface-container-low rounded-2xl p-8">
+      <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
+        <div className="lg:col-span-8 bg-surface-container-low rounded-2xl p-4 md:p-8">
           <div className="flex justify-between items-center mb-8">
             <h3 className="text-xl font-bold text-primary">Volume Trajectory</h3>
             <div className="flex space-x-2">
@@ -908,27 +967,31 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
               <button onClick={() => setRange('30D')} className={cn("px-3 py-1 rounded-full text-[10px] font-bold shadow-sm cursor-pointer", range === '30D' ? 'bg-white text-primary' : 'text-slate-400')}>30D</button>
             </div>
           </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={areaData}>
-                <defs>
-                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#006a6a" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#006a6a" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e0e3e5" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}}
-                  dy={10}
-                />
-                <Tooltip />
-                <Area type="monotone" dataKey="value" stroke="#006a6a" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="h-64 relative overflow-hidden">
+            {loading && !metrics ? (
+              <div className="absolute inset-0 skeleton-pulse shimmer-box rounded-xl"></div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={areaData}>
+                  <defs>
+                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#006a6a" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#006a6a" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e0e3e5" />
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}}
+                    dy={10}
+                  />
+                  <Tooltip />
+                  <Area type="monotone" dataKey="value" stroke="#006a6a" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -964,8 +1027,8 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
         </div>
       </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="premium-card premium-hover p-6 space-y-4">
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+        <div className="premium-card premium-hover p-4 md:p-6 space-y-4">
           <div className="flex justify-between items-center mb-2">
             <h3 className="text-lg font-bold text-primary">Pilot Localities</h3>
             <span className="text-xs font-bold text-secondary uppercase tracking-tighter">Live Map</span>
@@ -986,40 +1049,48 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col">
+        <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-100 flex flex-col">
           <h3 className="text-lg font-bold text-primary mb-6">Apartment Demand Split</h3>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={apartmentDemandData} barCategoryGap="30%">
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#94a3b8'}} width={30} />
-                <Tooltip formatter={(v: any) => [`${v} kg`, 'Volume']} />
-                <Bar dataKey="value" fill="#003366" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="h-48 relative overflow-hidden">
+            {loading && !metrics ? (
+              <div className="absolute inset-0 skeleton-pulse shimmer-box rounded-xl"></div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={apartmentDemandData} barCategoryGap="30%">
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 700, fill: '#94a3b8'}} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 9, fill: '#94a3b8'}} width={30} />
+                  <Tooltip formatter={(v: any) => [`${v} kg`, 'Volume']} />
+                  <Bar dataKey="value" fill="#003366" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+        <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-100">
           <h3 className="text-lg font-bold text-primary mb-6">Product Demand</h3>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={productDemandData}
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {productDemandData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="h-48 relative overflow-hidden">
+            {loading && !metrics ? (
+              <div className="absolute inset-0 skeleton-pulse shimmer-box rounded-full"></div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={productDemandData}
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {productDemandData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </div>
           <div className="grid grid-cols-1 gap-2 mt-4">
             {productDemandData.map((item, i) => (
@@ -1035,14 +1106,14 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
         </div>
       </section>
 
-      <section className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-        <div className="xl:col-span-7 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-lg font-bold text-primary">Current Fish Availability & Freshness</h3>
+      <section className="grid grid-cols-1 xl:grid-cols-12 gap-6 md:gap-8">
+        <div className="xl:col-span-7 bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+            <h3 className="text-lg font-bold text-primary">Current Fish Availability</h3>
             <span className="text-xs font-bold text-secondary uppercase tracking-widest">Live Freshness Desk</span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <table className="w-full text-left min-w-[500px]">
               <thead>
                 <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                   <th className="py-3 pr-4">Species</th>
@@ -1079,9 +1150,9 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
           </div>
         </div>
 
-        <div className="xl:col-span-5 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="text-lg font-bold text-primary">Current Orders & Daily Commitments</h3>
+        <div className="xl:col-span-5 bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+            <h3 className="text-lg font-bold text-primary">Daily Commitments</h3>
             <span className="text-xs font-bold text-primary uppercase tracking-widest">Operations</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
@@ -1727,3 +1798,5 @@ export const Dashboard = ({ onNavigate }: { onNavigate?: (tab: string) => void }
     </div>
   );
 };
+
+

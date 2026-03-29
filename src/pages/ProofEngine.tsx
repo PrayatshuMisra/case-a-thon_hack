@@ -10,18 +10,50 @@ import {
   TrendingUp, 
   Package, 
   ClipboardCheck,
-  ArrowDown
+  ArrowDown,
+  RefreshCw
 } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
 import { api, type DashboardMetrics } from '@/src/api/client';
 
 export const ProofEngine = () => {
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [modelScore, setModelScore] = useState<any>(null);
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(() => {
+    const cached = localStorage.getItem('mm_dashboard_metrics');
+    return cached ? JSON.parse(cached) : null;
+  });
+  const [modelScore, setModelScore] = useState<any>(() => {
+    const cached = localStorage.getItem('mm_traction_score');
+    return cached ? JSON.parse(cached) : null;
+  });
+
+  const [loading, setLoading] = useState(!metrics);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchData = async (isBackground = false) => {
+    if (isBackground) setRefreshing(true);
+    else setLoading(true);
+
+    try {
+      const [newMetrics, newScore] = await Promise.all([
+        api.getDashboardMetrics(),
+        api.getModelTractionScore()
+      ]);
+      setMetrics(newMetrics);
+      setModelScore(newScore);
+      localStorage.setItem('mm_dashboard_metrics', JSON.stringify(newMetrics));
+      localStorage.setItem('mm_traction_score', JSON.stringify(newScore));
+    } catch {
+      // Keep existing
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    api.getDashboardMetrics().then(setMetrics).catch(() => {});
-    api.getModelTractionScore().then(setModelScore).catch(() => {});
+    fetchData();
+    const poll = setInterval(() => fetchData(true), 30000);
+    return () => clearInterval(poll);
   }, []);
 
   const proof = metrics?.investor_proof;
@@ -50,23 +82,31 @@ export const ProofEngine = () => {
     <div className="max-w-7xl mx-auto space-y-12">
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-2">
-          <div className="inline-flex items-center px-3 py-1 bg-secondary-container text-primary rounded-full text-xs font-bold tracking-tight uppercase">
-            <span className="w-2 h-2 rounded-full bg-secondary mr-2 animate-pulse"></span>
-            Pilot Status: {proof?.pilot_status ?? 'Investor-Ready'}
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="inline-flex items-center px-3 py-1 bg-secondary-container text-primary rounded-full text-[10px] md:text-xs font-bold tracking-tight uppercase border border-primary/10">
+              <span className={cn("w-2 h-2 rounded-full mr-2", refreshing ? "bg-blue-500 animate-pulse" : "bg-secondary")} />
+              Pilot Status: {proof?.pilot_status ?? 'Investor-Ready'}
+            </div>
+            {refreshing && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-600 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest animate-pulse border border-blue-100">
+                <RefreshCw size={12} className="animate-spin" />
+                Updating Proof
+              </div>
+            )}
           </div>
-          <h1 className="text-4xl lg:text-5xl font-extrabold font-manrope tracking-tighter text-primary">
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-extrabold font-manrope tracking-tighter text-primary">
             LaunchOS Proof Engine
           </h1>
-          <p className="text-on-surface-variant max-w-2xl leading-relaxed">
+          <p className="text-on-surface-variant max-w-2xl leading-relaxed text-sm md:text-base">
             A live proof engine for Malpe Meen’s 90-day traction plan. Real-time diligence data for maritime high-value logistics.
           </p>
         </div>
-        <div className="bg-white p-4 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,30,64,0.06)] flex items-center gap-4">
+        <div className="bg-white p-4 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,30,64,0.06)] flex items-center gap-4 self-start md:self-auto min-w-[160px]">
           <div className="text-right">
             <p className="text-[10px] text-on-surface-variant font-bold uppercase tracking-widest">Evidence Strength</p>
             <p className="text-2xl font-black text-secondary">{Math.round(modelScore?.traction_score ?? metrics?.investor_readiness.overall_proof_score ?? 92)}<span className="text-sm font-medium text-on-surface-variant">/100</span></p>
           </div>
-          <div className="w-12 h-12 rounded-full border-4 border-secondary-container flex items-center justify-center relative">
+          <div className="w-12 h-12 rounded-full border-4 border-secondary-container flex items-center justify-center relative shrink-0">
             <ShieldCheck className="text-secondary" size={24} />
           </div>
         </div>
@@ -78,12 +118,20 @@ export const ProofEngine = () => {
             <h3 className="text-xl font-black text-primary">Model-attributed Traction Score</h3>
             <span className="text-xs font-black uppercase tracking-widest text-secondary">Updated {new Date(modelScore.generated_at).toLocaleString()}</span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
             {modelScore.components.map((c: any) => (
-              <div key={c.name} className="rounded-2xl border border-outline-variant/20 p-4 bg-white">
-                <p className="text-xs font-black uppercase tracking-widest text-slate-400">{c.name}</p>
-                <p className="text-3xl font-black text-primary mt-1">{Math.round(c.score)}</p>
-                <p className="text-xs font-bold text-secondary mt-1">{c.label}</p>
+              <div key={c.name} className={cn(
+                "rounded-2xl border border-outline-variant/20 p-4 bg-white relative overflow-hidden transition-all",
+                (loading && !metrics) ? "skeleton-pulse shadow-inner" : "shadow-sm hover:shadow-md"
+              )}>
+                {(loading && !metrics) && <div className="absolute inset-0 shimmer-box opacity-[0.03]"></div>}
+                <p className="text-[10px] md:text-xs font-black uppercase tracking-widest text-slate-400 leading-none">{c.name}</p>
+                {loading && !metrics ? (
+                  <div className="h-10 w-16 bg-slate-200/50 rounded animate-pulse mt-2"></div>
+                ) : (
+                  <p className="text-2xl md:text-3xl font-black text-primary mt-1 md:mt-2">{Math.round(c.score)}</p>
+                )}
+                <p className="text-[10px] md:text-xs font-bold text-secondary mt-1">{c.label}</p>
               </div>
             ))}
           </div>
@@ -99,22 +147,21 @@ export const ProofEngine = () => {
             <h3 className="text-xl font-bold font-manrope text-primary">Demand Proof</h3>
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
-            <div>
-              <p className="text-xs text-on-surface-variant font-semibold mb-1">Total Reservations</p>
-              <p className="text-3xl font-black text-primary">{proof?.total_reservations ?? '1,240'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-on-surface-variant font-semibold mb-1">Communities</p>
-              <p className="text-3xl font-black text-primary">{proof?.apartment_communities ?? 14}</p>
-            </div>
-            <div>
-              <p className="text-xs text-on-surface-variant font-semibold mb-1">Avg Basket</p>
-              <p className="text-3xl font-black text-primary">₹{proof?.average_basket_value ?? 980}</p>
-            </div>
-            <div>
-              <p className="text-xs text-on-surface-variant font-semibold mb-1">Total Weight</p>
-              <p className="text-3xl font-black text-primary">{proof?.total_kg_reserved ?? 840}kg</p>
-            </div>
+            {[
+              { label: 'Total Reservations', val: proof?.total_reservations ?? '1,240' },
+              { label: 'Communities', val: proof?.apartment_communities ?? 14 },
+              { label: 'Avg Basket', val: `₹${proof?.average_basket_value ?? 980}` },
+              { label: 'Total Weight', val: `${proof?.total_kg_reserved ?? 840}kg` }
+            ].map((stat) => (
+              <div key={stat.label}>
+                <p className="text-xs text-on-surface-variant font-semibold mb-1">{stat.label}</p>
+                {loading && !metrics ? (
+                  <div className="h-8 w-20 bg-slate-200/50 rounded animate-pulse mt-1"></div>
+                ) : (
+                  <p className="text-3xl font-black text-primary">{stat.val}</p>
+                )}
+              </div>
+            ))}
           </div>
           <div className="mt-8 pt-6 border-t border-slate-100 flex items-center justify-between">
             <span className="text-sm font-medium text-on-surface-variant">Primary Locality Focus</span>

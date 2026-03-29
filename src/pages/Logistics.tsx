@@ -141,7 +141,7 @@ export const Logistics = ({ onNavigate, orderId }: { onNavigate?: (tab: string) 
           <div className="lg:col-span-8 flex flex-col gap-6 relative z-10">
             
             {/* Route Intelligence Map */}
-            <div className="bg-white/40 backdrop-blur-md rounded-2xl p-6 shadow-lg border border-white/20 flex flex-col">
+            <div className="bg-white/40 backdrop-blur-md rounded-2xl p-4 md:p-6 shadow-lg border border-white/20 flex flex-col">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-slate-900">Route Intelligence</h3>
                 <span className="bg-white/40 px-3 py-1 rounded-md text-[11px] font-semibold tracking-wide text-slate-700 border border-white/20 uppercase">Satellite Sync</span>
@@ -154,10 +154,10 @@ export const Logistics = ({ onNavigate, orderId }: { onNavigate?: (tab: string) 
             {/* 3 Mini Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Vessel Identity */}
-              <div className="p-5 bg-white/40 backdrop-blur-md rounded-xl flex flex-col justify-between shadow-lg border border-white/20">
+              <div className="p-4 md:p-5 bg-white/40 backdrop-blur-md rounded-xl flex flex-col justify-between shadow-lg border border-white/20">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-white/40 text-slate-700 border border-white/20 flex items-center justify-center shrink-0">
-                    <Ship size={20} />
+                  <div className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-white/40 text-slate-700 border border-white/20 flex items-center justify-center shrink-0">
+                    <Ship size={18} />
                   </div>
                   <div>
                     <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Vessel Identity</p>
@@ -171,17 +171,17 @@ export const Logistics = ({ onNavigate, orderId }: { onNavigate?: (tab: string) 
               </div>
 
               {/* Cold Chain */}
-              <div className="p-5 bg-white/40 backdrop-blur-md rounded-xl flex flex-col justify-between shadow-lg border border-white/20">
+              <div className="p-4 md:p-5 bg-white/40 backdrop-blur-md rounded-xl flex flex-col justify-between shadow-lg border border-white/20">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
-                    <Thermometer size={20} />
+                  <div className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
+                    <Thermometer size={18} />
                   </div>
                   <div>
                     <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Thermal Stability</p>
-                    <p className="text-sm font-bold text-slate-900 mt-0.5 flex items-center gap-2">
+                    <p className="text-xs md:text-sm font-bold text-slate-900 mt-0.5 flex flex-wrap items-center gap-1.5 md:gap-2">
                       {tracking?.cold_chain_maintained ? '2.1°C' : 'Fluctuating'} 
                       <span className={cn(
-                        "px-1.5 py-0.5 rounded text-[10px] font-bold",
+                        "px-1.5 py-0.5 rounded text-[9px] md:text-[10px] font-bold",
                         tracking?.cold_chain_maintained ? "bg-blue-100 text-blue-700" : "bg-red-100 text-red-700"
                       )}>
                         {tracking?.cold_chain_maintained ? 'OPTIMAL' : 'AT RISK'}
@@ -202,16 +202,16 @@ export const Logistics = ({ onNavigate, orderId }: { onNavigate?: (tab: string) 
               </div>
 
               {/* Freshness Index */}
-              <div className="p-5 bg-white/40 backdrop-blur-md rounded-xl flex flex-col justify-between shadow-lg border border-white/20">
+              <div className="p-4 md:p-5 bg-white/40 backdrop-blur-md rounded-xl flex flex-col justify-between shadow-lg border border-white/20">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
-                    <Award size={20} />
+                  <div className="w-9 h-9 md:w-10 md:h-10 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
+                    <Award size={18} />
                   </div>
                   <div>
                     <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Freshness Index</p>
-                    <p className="text-sm font-bold text-slate-900 mt-0.5 flex items-center gap-2">
+                    <p className="text-xs md:text-sm font-bold text-slate-900 mt-0.5 flex flex-wrap items-center gap-1.5 md:gap-2">
                       {tracking?.freshness_score ?? 94}/100 
-                      <span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                      <span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded text-[9px] md:text-[10px] font-bold">
                         {tracking?.freshness_label ?? 'GRADE A'}
                       </span>
                     </p>
@@ -309,30 +309,30 @@ export const Logistics = ({ onNavigate, orderId }: { onNavigate?: (tab: string) 
 
           {/* ================= RIGHT COLUMN (Sidebar - Width: 4/12) ================= */}
           <div className="lg:col-span-4 flex flex-col h-full relative z-10">
-            <div className="bg-white/40 backdrop-blur-md rounded-2xl p-6 shadow-lg border border-white/20 flex flex-col h-full">
+            <div className="bg-white/40 backdrop-blur-md rounded-2xl p-4 md:p-6 shadow-lg border border-white/20 flex flex-col h-full">
               
               {/* Order Status & Product Banner */}
               <div className="mb-8">
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-100 text-blue-700 rounded-md text-xs font-semibold tracking-wide uppercase mb-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 border border-blue-100 text-blue-700 rounded-md text-[10px] md:text-xs font-semibold tracking-wide uppercase mb-4">
                   <div className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-pulse"></div>
                   Order Status: In Transit
                 </div>
-                <h3 className="text-2xl font-bold text-slate-900 tracking-tight mb-2">Your catch is reserved.</h3>
-                <p className="text-slate-500 text-sm leading-relaxed mb-6">
+                <h3 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight mb-2">Your catch is reserved.</h3>
+                <p className="text-slate-500 text-xs md:text-sm leading-relaxed mb-6">
                   {tracking ? `Tracking ${tracking.product_name} for ${tracking.customer_name}. ETA: ${new Date(tracking.eta).toLocaleString()}` : 'Currently being processed at the Malpe Quality Hub. Expected delivery tomorrow by sunrise.'}
                 </p>
                 
-                <div className="bg-white/40 border border-white/20 p-4 rounded-xl flex items-center gap-4 shadow-inner">
+                <div className="bg-white/40 border border-white/20 p-3 md:p-4 rounded-xl flex items-center gap-4 shadow-inner">
                   <img 
                     src="https://picsum.photos/seed/seerfish/200/200" 
                     alt="Catch" 
-                    className="w-14 h-14 rounded-lg object-cover border border-slate-200 bg-white shadow-sm shrink-0"
+                    className="w-12 h-12 md:w-14 md:h-14 rounded-lg object-cover border border-slate-200 bg-white shadow-sm shrink-0"
                     referrerPolicy="no-referrer"
                   />
                   <div className="space-y-1">
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">Product</p>
-                    <p className="text-base font-bold text-slate-900 leading-tight">{tracking?.product_name ?? 'Seer Fish'}</p>
-                    <p className="text-xs font-medium text-slate-600 flex items-center gap-1.5">
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest leading-none">Product</p>
+                    <p className="text-sm md:text-base font-bold text-slate-900 leading-tight">{tracking?.product_name ?? 'Seer Fish'}</p>
+                    <p className="text-[10px] md:text-xs font-medium text-slate-600 flex items-center gap-1.5">
                       <Scale size={12} className="text-slate-400" />
                       {tracking ? `${tracking.quantity_kg}kg • ${tracking.freshness_label}` : '1.2kg • Premium Cut'}
                     </p>

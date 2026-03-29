@@ -210,10 +210,10 @@ export const Home = ({
                 Fresh from Malpe. At your apartment by sunrise.
               </div>
 
-              <h1 className="text-6xl md:text-8xl font-manrope font-extrabold tracking-tighter text-primary leading-[1.1] flex items-center gap-4 md:gap-6">
-                <img src={logo} alt="Malpe Meen" className="w-26 md:w-48 drop-shadow-md" />
+              <h1 className="text-4xl sm:text-6xl md:text-8xl font-manrope font-extrabold tracking-tighter text-primary leading-[1.1] flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+                <img src={logo} alt="Malpe Meen" className="w-24 sm:w-32 md:w-48 drop-shadow-md" />
                 <div>
-                  Malpe Meen <br />
+                  Malpe Meen <br className="hidden md:block" />
                   <span className="text-transparent bg-clip-text bg-gradient-to-r from-secondary to-blue-500">
                     LaunchOS
                   </span>
@@ -249,7 +249,7 @@ export const Home = ({
         </header>
 
         {/* Floating Stats Section */}
-        <section className="container mx-auto px-6 -mt-32 relative z-20">
+        <section className="container mx-auto px-6 -mt-16 md:-mt-32 relative z-20">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               {
@@ -367,7 +367,7 @@ export const Home = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10">
             {cards.map((item, i) => (
               <div
                 key={i}
@@ -405,50 +405,50 @@ export const Home = ({
                   </div>
                 </div>
 
-                <div className="p-10 flex flex-col flex-grow relative">
-                  <div className="flex justify-between items-start mb-8">
-                    <div>
-                      <h3 className="text-3xl font-manrope font-black text-primary mb-1 tracking-tight">
+                <div className="p-5 md:p-8 lg:p-10 flex flex-col flex-grow relative">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6 md:mb-8">
+                    <div className="min-w-0">
+                      <h3 className="text-2xl md:text-3xl font-manrope font-black text-primary mb-1 tracking-tight truncate sm:whitespace-normal">
                         {item.name}
                       </h3>
-                      <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">
+                      <p className="text-slate-400 text-[10px] md:text-xs font-bold uppercase tracking-widest">
                         {item.sci}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <span className="text-sm line-through text-slate-300 font-bold decoration-red-500/20">
+                    <div className="sm:text-right shrink-0">
+                      <span className="text-xs md:text-sm line-through text-slate-300 font-bold decoration-red-500/20">
                         {item.old}
                       </span>
-                      <div className="flex items-baseline gap-1">
-                        <p className="text-3xl font-black text-primary tracking-tighter">
+                      <div className="flex items-baseline gap-1 sm:justify-end">
+                        <p className="text-2xl md:text-3xl font-black text-primary tracking-tighter">
                           {item.price}
                         </p>
-                        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                        <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest">
                           /kg
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between p-5 bg-slate-50/50 border border-slate-100 rounded-3xl mb-10 group-hover:bg-primary/5 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center border border-slate-100">
-                        <Award size={24} className="text-emerald-500" />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 md:p-5 bg-slate-50/50 border border-slate-100 rounded-3xl mb-8 md:mb-10 group-hover:bg-primary/5 transition-colors gap-4">
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center border border-slate-100 shrink-0">
+                        <Award size={20} className="text-emerald-500 md:w-6 md:h-6" />
                       </div>
                       <div>
-                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-0.5">
+                        <p className="text-[9px] md:text-[10px] font-black uppercase text-slate-400 tracking-widest mb-0.5 leading-none">
                           Fresh Score
                         </p>
-                        <p className="text-xl font-black text-primary leading-none tracking-tight">
-                          {item.score}<span className="text-slate-300 text-sm">/100</span>
+                        <p className="text-lg md:text-xl font-black text-primary leading-none tracking-tight mt-1">
+                          {item.score}<span className="text-slate-300 text-xs md:text-sm">/100</span>
                         </p>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end">
-                      <span className="px-3 py-1 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[10px] font-black rounded-lg uppercase tracking-widest shadow-sm">
+                    <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2">
+                      <span className="px-2.5 py-1 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[9px] md:text-[10px] font-black rounded-lg uppercase tracking-widest shadow-sm">
                         Grade A+
                       </span>
-                      <p className="text-[9px] font-bold text-emerald-500 mt-1 uppercase tracking-tighter">Verified AI Audit</p>
+                      <p className="text-[8px] md:text-[9px] font-bold text-emerald-500 uppercase tracking-tighter">Verified AI Audit</p>
                     </div>
                   </div>
 
@@ -528,9 +528,9 @@ export const Home = ({
           </div>
         </section>
 
-        <section className="container mx-auto px-6 relative z-10">
-          <div className="max-w-6xl mx-auto bg-white/40 backdrop-blur-xl rounded-[3rem] overflow-hidden shadow-2xl flex flex-col lg:flex-row border border-white/60">
-            <div className="flex-1 p-10 lg:p-16 bg-white/30">
+        <section className="container mx-auto px-4 md:px-6 relative z-10">
+          <div className="max-w-6xl mx-auto bg-white/40 backdrop-blur-xl rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl flex flex-col lg:flex-row border border-white/60">
+            <div className="flex-1 p-6 md:p-10 lg:p-16 bg-white/30">
               <div className="mb-10">
                 <h2 className="text-4xl font-manrope font-extrabold text-primary mb-4 tracking-tight drop-shadow-sm">
                   Secure Your Catch
