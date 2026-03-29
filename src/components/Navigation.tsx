@@ -176,28 +176,33 @@ export const TopNav = ({
         </div>
 
         <div className="flex items-center space-x-2 md:space-x-4">
-          <div className="hidden md:flex items-center rounded-full bg-white/30 backdrop-blur-md border border-white/40 p-1 gap-1 shadow-inner">
+          {/* Persona Switcher — always visible, compact on mobile */}
+          <div className="flex items-center rounded-full bg-white/30 backdrop-blur-md border border-white/40 p-1 gap-1 shadow-inner">
             <button
               onClick={() => onPersonaChange?.('consumer')}
               className={cn(
-                'px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-300',
+                'rounded-full font-black uppercase tracking-widest transition-all duration-300',
+                'px-2.5 py-1 text-[9px] md:px-4 md:py-1.5 md:text-[10px]',
                 persona === 'consumer' 
                   ? 'bg-white/80 text-primary shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)]' 
                   : 'text-slate-600 hover:bg-white/40'
               )}
             >
-              Buyer
+              <span className="md:hidden">B</span>
+              <span className="hidden md:inline">Buyer</span>
             </button>
             <button
               onClick={() => onPersonaChange?.('admin')}
               className={cn(
-                'px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all duration-300',
+                'rounded-full font-black uppercase tracking-widest transition-all duration-300',
+                'px-2.5 py-1 text-[9px] md:px-4 md:py-1.5 md:text-[10px]',
                 persona === 'admin' 
                   ? 'bg-white/80 text-primary shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)]' 
                   : 'text-slate-600 hover:bg-white/40'
               )}
             >
-              Admin
+              <span className="md:hidden">A</span>
+              <span className="hidden md:inline">Admin</span>
             </button>
           </div>
           <button onClick={() => goTo(persona === 'admin' ? 'dashboard' : 'home')} className="p-2 md:p-2.5 hover:bg-white/50 bg-white/20 backdrop-blur-sm border border-white/30 rounded-xl transition-all shadow-sm">

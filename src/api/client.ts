@@ -235,4 +235,58 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(payload),
   }),
+
+  // ── Dynamic Spoilage Re-routing ───────────────────────────
+  evaluateSpoilageReroute: (payload: {
+    order_id: string;
+    species: string;
+    catch_time: string;
+    arrival_eta: string;
+    current_temp_c: number;
+    drift_event?: {
+      detected_at: string;
+      observed_temp_c: number;
+      duration_minutes: number;
+    } | null;
+    delivery_lat?: number;
+    delivery_lng?: number;
+    quantity_kg?: number;
+    original_price_per_kg?: number;
+  }) => request<SpoilageRerouteDecision>('/api/spoilage/evaluate-reroute', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }),
+
+  simulateSpoilageScenario: (
+    scenario: 'd2c_safe' | 'flash_discount' | 'reroute_restaurant' | 'hold_and_inspect'
+  ) => request<SpoilageRerouteDecision & { scenario: string }>(
+    `/api/spoilage/simulate/${scenario}`
+  ),
+};
+
+export type SpoilageRerouteDecision = {
+  order_id: string;
+  species: string;
+  action: 'd2c_safe' | 'flash_discount' | 'reroute_restaurant' | 'hold_and_inspect';
+  confidence: number;
+  survival_probability_pct: number;
+  projected_shelf_life_hours: number;
+  hours_to_d2c_eta: number;
+  salvage_discount_pct: number;
+  restaurant_partner: {
+    id: string;
+    name: string;
+    locality: string;
+    lat: number;
+    lng: number;
+    cuisine: string;
+    capacity_kg: number;
+    contact: string;
+    distance_km: number;
+  } | null;
+  original_price_per_kg: number;
+  salvage_price_per_kg: number;
+  rationale: string[];
+  drift_severity: 'none' | 'mild' | 'moderate' | 'critical';
+  ml_features: Record<string, number | string>;
 };

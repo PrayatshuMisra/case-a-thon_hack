@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import live_drop, orders, dashboard, fishers, lois, tracking, recommendations, experiments, supabase_status, sms
 from app.routes import ml
+from app.routes import spoilage
 
 app = FastAPI(
     title="Malpe Meen LaunchOS API",
@@ -28,6 +29,7 @@ app.include_router(recommendations.router, tags=["Recommendations"])
 app.include_router(experiments.router, tags=["Experiments"])
 app.include_router(supabase_status.router, tags=["Supabase"])
 app.include_router(sms.router, tags=["SMS"])
+app.include_router(spoilage.router, tags=["Spoilage Re-routing"])
 
 @app.get("/")
 def read_root():

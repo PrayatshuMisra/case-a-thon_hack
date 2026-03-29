@@ -19,6 +19,7 @@ import {
 import { cn } from '@/src/lib/utils';
 import { api } from '@/src/api/client';
 import { LiveRouteMap, type RoutePoint } from '@/src/components/LiveRouteMap';
+import { SpoilageRerouter } from '@/src/components/SpoilageRerouter';
 import homeBg from "@/src/assets/home-bg.avif";
 
 export const Logistics = ({ onNavigate, orderId }: { onNavigate?: (tab: string) => void; orderId?: string | null }) => {
@@ -468,6 +469,14 @@ export const Logistics = ({ onNavigate, orderId }: { onNavigate?: (tab: string) 
              <p className="text-sm font-medium text-slate-500 text-center">{info}</p>
           </div>
         )}
+
+        {/* ── ML Spoilage Re-routing Engine ── */}
+        <section className="px-4 lg:px-0">
+          <div className="bg-white/50 backdrop-blur-md rounded-2xl border border-white/40 shadow-lg p-6 md:p-8">
+            <SpoilageRerouter />
+          </div>
+        </section>
+
       </div>
     </div>
   );
